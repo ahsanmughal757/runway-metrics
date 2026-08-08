@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: runway
+    ports:
+      - "5432:5432"
+    volumes:
+      - runway_pg_data:/var/lib/postgresql/data
+
+volumes:
+  runway_pg_data:

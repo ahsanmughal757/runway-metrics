@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  FOUNDER
+  INVESTOR
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model User {
+  id             String               @id @default(cuid())
+  email          String               @unique
+  passwordHash   String
+  name           String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  memberships    CompanyMembership[]
+  auditLogs      AuditLog[]
+  sentInvites    InvestorInvite[]     @relation("InviteSender")
+}
+
+model Company {
+  id           String               @id @default(cuid())
+  name         String
+  orgId        String               @default(cuid())
+  persona      String?              // seed-only: which fake persona this demo company represents
+  runwayGreenMonths  Int            @default(12) // >= this many months = green zone
+  runwayYellowMonths Int            @default(6)  // >= this many months = yellow zone, below = red
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  memberships  CompanyMembership[]
+  snapshots    MetricSnapshot[]
+  cohorts      CohortEntry[]
+  invites      InvestorInvite[]
+  auditLogs    AuditLog[]
+}
+
+model CompanyMembership {
+  id         String         @id @default(cuid())
+  userId     String
+  companyId  String
+  role       MembershipRole
+  createdAt  DateTime       @default(now())
+
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@index([companyId])
+}
+
+model InvestorInvite {
+  id          String        @id @default(cuid())
+  companyId   String
+  email       String
+  status      InviteStatus  @default(PENDING)
+  invitedById String
+  createdAt   DateTime      @default(now())
+  respondedAt DateTime?
+
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invitedBy   User          @relation("InviteSender", fields: [invitedById], references: [id])
+
+  @@index([companyId])
+}
+
+// One row per company per month. Decimal types throughout for currency precision.
+model MetricSnapshot {
+  id               String   @id @default(cuid())
+  companyId        String
+  month            DateTime // normalized to first-of-month
+  mrr              Decimal  @db.Decimal(14, 2)
+  newMrr           Decimal  @db.Decimal(14, 2) @default(0)
+  expansionMrr     Decimal  @db.Decimal(14, 2) @default(0)
+  contractionMrr   Decimal  @db.Decimal(14, 2) @default(0)
+  churnedMrr       Decimal  @db.Decimal(14, 2) @default(0)
+  newCustomers     Int      @default(0)
+  churnedCustomers Int      @default(0)
+  totalCustomers   Int      @default(0)
+  burnRate         Decimal  @db.Decimal(14, 2)
+  cash             Decimal  @db.Decimal(14, 2)
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month])
+  @@index([companyId, month])
+}
+
+// Fake/seed data only in v1 — real per-customer ingestion is v2 scope.
+model CohortEntry {
+  id           String   @id @default(cuid())
+  companyId    String
+  customerId   String
+  signupMonth  DateTime
+  status       String   // active | churned
+  mrrByMonth   Json     // { "0": 120.00, "1": 118.00, ... } keyed by months-since-signup
+  createdAt    DateTime @default(now())
+
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, signupMonth])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  entityId   String
+  entityType String
+  action     String
+  changedBy  String
+  changedAt  DateTime @default(now())
+  diff       Json?
+
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [changedBy], references: [id])
+
+  @@index([companyId, changedAt])
+}
