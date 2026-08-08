@@ -4,9 +4,9 @@ export const chartColors = {
   accent: '#6f7cff',
   accent2: '#a78bfa',
   amber: '#f6b93b',
-  muted: '#8892a8',
-  axis: '#2b3449',
-  grid: '#1b2233',
+  muted: 'rgb(var(--runway-muted))',
+  axis: 'rgb(var(--runway-borderStrong))',
+  grid: 'rgb(var(--runway-border))',
 };
 
 export const axisTickStyle = { fill: chartColors.muted, fontSize: 11 };

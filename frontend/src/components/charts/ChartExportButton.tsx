@@ -26,6 +26,35 @@ export function ChartExportButton({ targetRef }: { targetRef: RefObject<HTMLElem
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
 
+    // Standalone SVG has no access to the app's CSS variables, so resolve any
+    // var(--runway-*) colors to their computed values before serializing.
+    const resolvedCache: Record<string, string> = {};
+    function resolveVar(value: string): string {
+      const replaced = value.replace(/var\((--[\w-]+)\)/g, (full, key: string) => {
+        if (!(key in resolvedCache)) {
+          const raw = getComputedStyle(document.documentElement).getPropertyValue(key).trim();
+          resolvedCache[key] = raw;
+        }
+        return resolvedCache[key] || full;
+      });
+      if (/^var\(--[\w-]+\)$/.test(value.trim())) return `rgb(${replaced})`;
+      return replaced;
+    }
+    const walk = (node: Node) => {
+      if (node instanceof SVGElement) {
+        for (const attr of ['stroke', 'fill', 'stop-color', 'color']) {
+          const v = node.getAttribute(attr);
+          if (v && v.includes('var(')) node.setAttribute(attr, resolveVar(v));
+        }
+        const style = node.getAttribute('style');
+        if (style && style.includes('var(')) {
+          node.setAttribute('style', style.replace(/var\(--[\w-]+\)/g, resolveVar));
+        }
+      }
+      node.childNodes.forEach(walk);
+    };
+    walk(clone);
+
     const svgString = new XMLSerializer().serializeToString(clone);
     const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
     const url = URL.createObjectURL(blob);

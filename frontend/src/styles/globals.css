@@ -2,22 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Theme tokens -------------------------------------------------------
+   Adaptive surfaces live on CSS variables so one `.dark` / `.runwayLight`
+   class flips the whole app (Tailwind + HeroUI) at once. Data-viz accents
+   (accent / positive / negative / amber) stay constant across themes.      */
+:root {
+  color-scheme: light;
+  --runway-bg: 244 246 251;
+  --runway-surface: 255 255 255;
+  --runway-raised: 255 255 255;
+  --runway-charcoal: 238 241 247;
+  --runway-border: 226 233 242;
+  --runway-borderStrong: 203 213 225;
+  --runway-text: 26 35 51;
+  --runway-muted: 71 85 105;
+  --runway-thumb: 203 213 225;
+  --runway-thumb-hover: 148 163 184;
+  --runway-glow-1: rgba(111, 124, 255, 0.08);
+  --runway-glow-2: rgba(167, 139, 250, 0.06);
+  --runway-glow-3: rgba(52, 211, 153, 0.04);
+  --runway-sheen-mid: rgba(15, 23, 42, 0.06);
+  --runway-selection-text: #0f172a;
+  --runway-shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.06), 0 8px 22px -12px rgba(15, 23, 42, 0.12);
+  --runway-shadow-raised: 0 16px 48px -16px rgba(15, 23, 42, 0.18);
+  --runway-shadow-popover: 0 16px 44px -12px rgba(15, 23, 42, 0.2);
+  --runway-shadow-glow: 0 0 0 1px rgba(111, 124, 255, 0.18), 0 10px 30px -12px rgba(111, 124, 255, 0.28);
+  --runway-shadow-glow-green: 0 0 0 1px rgba(52, 211, 153, 0.2), 0 8px 24px -12px rgba(52, 211, 153, 0.25);
+  --runway-shadow-glow-red: 0 0 0 1px rgba(251, 113, 133, 0.2), 0 8px 24px -12px rgba(251, 113, 133, 0.25);
+  --runway-shadow-glow-amber: 0 0 0 1px rgba(246, 185, 59, 0.2), 0 8px 24px -12px rgba(246, 185, 59, 0.25);
+}
+
+.dark {
+  color-scheme: dark;
+  --runway-bg: 10 12 18;
+  --runway-surface: 16 20 29;
+  --runway-raised: 23 28 42;
+  --runway-charcoal: 13 17 25;
+  --runway-border: 27 34 51;
+  --runway-borderStrong: 43 52 73;
+  --runway-text: 232 236 245;
+  --runway-muted: 136 146 168;
+  --runway-thumb: 43 52 73;
+  --runway-thumb-hover: 58 69 96;
+  --runway-glow-1: rgba(111, 124, 255, 0.1);
+  --runway-glow-2: rgba(167, 139, 250, 0.08);
+  --runway-glow-3: rgba(52, 211, 153, 0.045);
+  --runway-sheen-mid: rgba(255, 255, 255, 0.14);
+  --runway-selection-text: #e8ecf5;
+  --runway-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -14px rgba(0, 0, 0, 0.55);
+  --runway-shadow-raised: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
+  --runway-shadow-popover: 0 24px 64px -16px rgba(0, 0, 0, 0.8);
+  --runway-shadow-glow: 0 0 0 1px rgba(111, 124, 255, 0.22), 0 10px 34px -10px rgba(111, 124, 255, 0.4);
+  --runway-shadow-glow-green: 0 0 0 1px rgba(52, 211, 153, 0.25), 0 8px 28px -10px rgba(52, 211, 153, 0.35);
+  --runway-shadow-glow-red: 0 0 0 1px rgba(251, 113, 133, 0.25), 0 8px 28px -10px rgba(251, 113, 133, 0.35);
+  --runway-shadow-glow-amber: 0 0 0 1px rgba(246, 185, 59, 0.25), 0 8px 28px -10px rgba(246, 185, 59, 0.35);
+}
+
 @layer base {
   html {
     @apply antialiased;
   }
   body {
     @apply font-body text-runway-text;
-    background-color: #0a0c12;
+    background-color: rgb(var(--runway-bg));
     background-image:
-      radial-gradient(1000px 520px at 8% -8%, rgba(111, 124, 255, 0.1), transparent 60%),
-      radial-gradient(900px 500px at 106% -4%, rgba(167, 139, 250, 0.08), transparent 55%),
-      radial-gradient(900px 700px at 50% 115%, rgba(52, 211, 153, 0.045), transparent 60%);
+      radial-gradient(1000px 520px at 8% -8%, var(--runway-glow-1), transparent 60%),
+      radial-gradient(900px 500px at 106% -4%, var(--runway-glow-2), transparent 55%),
+      radial-gradient(900px 700px at 50% 115%, var(--runway-glow-3), transparent 60%);
     background-attachment: fixed;
   }
   ::selection {
     background: rgba(111, 124, 255, 0.3);
-    color: #e8ecf5;
+    color: var(--runway-selection-text);
   }
   ::-webkit-scrollbar {
     width: 10px;
@@ -27,19 +83,48 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #2b3449;
+    background: rgb(var(--runway-thumb));
     border-radius: 999px;
     border: 2.5px solid transparent;
     background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a4560;
+    background: rgb(var(--runway-thumb-hover));
     background-clip: padding-box;
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: #2b3449 transparent;
+    scrollbar-color: rgb(var(--runway-thumb)) transparent;
   }
+}
+
+/* Smooth theme flip — added transiently by the theme toggle. */
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    color 0.22s ease,
+    fill 0.22s ease,
+    stroke 0.22s ease,
+    box-shadow 0.22s ease !important;
+}
+
+/* Recharts chrome follows the active theme even when recharts bakes the
+   value into SVG presentation attributes (var() support in attributes is
+   inconsistent across browsers). Series colors are untouched. */
+.recharts-cartesian-grid line {
+  stroke: rgb(var(--runway-border));
+}
+.recharts-cartesian-axis-line {
+  stroke: rgb(var(--runway-border));
+}
+.recharts-cartesian-axis-tick text {
+  fill: rgb(var(--runway-muted));
+}
+.recharts-tooltip-cursor {
+  stroke: rgb(var(--runway-borderStrong));
 }
 
 @layer components {
@@ -50,6 +135,6 @@
   .runway-sheen::before {
     content: '';
     @apply pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-2xl;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+    background: linear-gradient(90deg, transparent, var(--runway-sheen-mid), transparent);
   }
 }

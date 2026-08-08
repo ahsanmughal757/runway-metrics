@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Avatar, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Select, SelectItem, Switch, Tab, Tabs } from '@heroui/react';
 import { Command, Moon, Sun, UserRound, Building2, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../lib/CompanyContext';
 import { useAuth } from '../lib/AuthContext';
+import { applyTheme, AppTheme, getStoredTheme, setStoredTheme } from '../lib/theme';
 import { NotificationsBell } from './NotificationsBell';
 import { DataAsOf } from './DataAsOf';
 
@@ -11,12 +12,15 @@ export function TopBar() {
   const { companies, activeCompanyId, setActiveCompanyId, role, setRole } = useCompany();
   const navigate = useNavigate();
   const auth = useAuth();
-  const [dark, setDark] = useState(() => (localStorage.getItem('runway_theme') ?? 'dark') === 'dark');
+  const [dark, setDark] = useState(() => getStoredTheme() === 'dark');
 
-  useEffect(() => {
-    document.documentElement.classList.toggle('light', !dark);
-    document.documentElement.classList.toggle('dark', dark);
-  }, [dark]);
+  // checked = light (Switch shows Sun when selected).
+  function handleThemeChange(checked: boolean) {
+    const next: AppTheme = checked ? 'light' : 'dark';
+    setDark(next === 'dark');
+    setStoredTheme(next);
+    applyTheme(next, true);
+  }
 
   function handleLogout() {
     auth.logout();
@@ -89,11 +93,7 @@ export function TopBar() {
           aria-label="Theme toggle"
           size="sm"
           isSelected={!dark}
-          onChange={(e) => {
-            const next = !e.target.checked;
-            setDark(next);
-            localStorage.setItem('runway_theme', next ? 'dark' : 'light');
-          }}
+          onChange={(e) => handleThemeChange(e.target.checked)}
           thumbIcon={({ isSelected, className }) =>
             isSelected ? <Sun className={className} size={12} /> : <Moon className={className} size={12} />}
           classNames={{

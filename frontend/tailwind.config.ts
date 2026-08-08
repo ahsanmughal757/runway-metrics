@@ -12,18 +12,18 @@ export default {
     extend: {
       colors: {
         runway: {
-          bg: '#0a0c12',        // near-black base — depth without navy murk
-          surface: '#10141d',   // lifted surface
-          raised: '#171c2a',    // modal / dropdown elevation
-          charcoal: '#0d1119',  // inset / subtle panels
-          border: '#1b2233',    // barely-there hairline
-          borderStrong: '#2b3449',
-          text: '#e8ecf5',
-          muted: '#8892a8',
-          positive: '#34d399',
+          bg: 'rgb(var(--runway-bg) / <alpha-value>)',
+          surface: 'rgb(var(--runway-surface) / <alpha-value>)',
+          raised: 'rgb(var(--runway-raised) / <alpha-value>)',
+          charcoal: 'rgb(var(--runway-charcoal) / <alpha-value>)',
+          border: 'rgb(var(--runway-border) / <alpha-value>)',
+          borderStrong: 'rgb(var(--runway-borderStrong) / <alpha-value>)',
+          text: 'rgb(var(--runway-text) / <alpha-value>)',
+          muted: 'rgb(var(--runway-muted) / <alpha-value>)',
+          positive: '#34d399', // data-viz accent — constant across themes
           negative: '#fb7185',
-          accent: '#6f7cff',    // indigo primary
-          accent2: '#a78bfa',   // violet secondary
+          accent: '#6f7cff',
+          accent2: '#a78bfa',
           amber: '#f6b93b',
         },
       },
@@ -67,12 +67,12 @@ export default {
         'pulse-dot': 'pulse-dot 1.8s ease-in-out infinite',
       },
       boxShadow: {
-        soft: '0 1px 2px rgba(0,0,0,0.4), 0 10px 30px -14px rgba(0,0,0,0.55)',
-        raised: '0 12px 40px -12px rgba(0,0,0,0.7)',
-        glow: '0 0 0 1px rgba(111,124,255,0.22), 0 10px 34px -10px rgba(111,124,255,0.4)',
-        'glow-green': '0 0 0 1px rgba(52,211,153,0.25), 0 8px 28px -10px rgba(52,211,153,0.35)',
-        'glow-red': '0 0 0 1px rgba(251,113,133,0.25), 0 8px 28px -10px rgba(251,113,133,0.35)',
-        'glow-amber': '0 0 0 1px rgba(246,185,59,0.25), 0 8px 28px -10px rgba(246,185,59,0.35)',
+        soft: 'var(--runway-shadow-soft)',
+        raised: 'var(--runway-shadow-raised)',
+        glow: 'var(--runway-shadow-glow)',
+        'glow-green': 'var(--runway-shadow-glow-green)',
+        'glow-red': 'var(--runway-shadow-glow-red)',
+        'glow-amber': 'var(--runway-shadow-glow-amber)',
         insetSoft: 'inset 0 1px 0 rgba(255,255,255,0.04)',
       },
     },
@@ -102,6 +102,28 @@ export default {
             success: { DEFAULT: '#34d399', foreground: '#0a0c12' },
             danger: { DEFAULT: '#fb7185', foreground: '#ffffff' },
             warning: { DEFAULT: '#f6b93b', foreground: '#0a0c12' },
+          },
+        },
+        runwayLight: {
+          extend: 'light',
+          colors: {
+            background: '#f4f6fb',
+            content1: '#ffffff',
+            content2: '#eef1f7',
+            content3: '#ffffff',
+            divider: '#e2e9f2',
+            focus: '#6f7cff',
+            default: {
+              50: '#ffffff', 100: '#eef1f7', 200: '#e2e9f2', 300: '#cbd5e1',
+              400: '#64748b', 500: '#475569', 600: '#334155', 700: '#293548',
+              800: '#1a2333', 900: '#0f172a',
+              foreground: '#1a2333', DEFAULT: '#e2e9f2',
+            },
+            primary: { DEFAULT: '#6f7cff', foreground: '#ffffff' },
+            secondary: { DEFAULT: '#a78bfa', foreground: '#1a2333' },
+            success: { DEFAULT: '#34d399', foreground: '#052e1c' },
+            danger: { DEFAULT: '#fb7185', foreground: '#ffffff' },
+            warning: { DEFAULT: '#f6b93b', foreground: '#3a2a05' },
           },
         },
       },
