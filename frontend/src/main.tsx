@@ -8,6 +8,10 @@ import { AuthProvider } from './lib/AuthContext';
 import { ToastProvider } from './lib/ToastContext';
 import './styles/globals.css';
 
+// Apply the persisted theme class before first paint (dark is the default).
+const savedTheme = (localStorage.getItem('runway_theme') ?? 'dark') === 'dark' ? 'dark' : 'light';
+document.documentElement.classList.add(savedTheme);
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HeroUIProvider>

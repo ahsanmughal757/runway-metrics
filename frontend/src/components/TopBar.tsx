@@ -1,10 +1,27 @@
-import { Avatar, Select, SelectItem, Tab, Tabs } from '@heroui/react';
-import { Command } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Avatar, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Select, SelectItem, Switch, Tab, Tabs } from '@heroui/react';
+import { Command, Moon, Sun, UserRound, Building2, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../lib/CompanyContext';
+import { useAuth } from '../lib/AuthContext';
 import { NotificationsBell } from './NotificationsBell';
+import { DataAsOf } from './DataAsOf';
 
 export function TopBar() {
   const { companies, activeCompanyId, setActiveCompanyId, role, setRole } = useCompany();
+  const navigate = useNavigate();
+  const auth = useAuth();
+  const [dark, setDark] = useState(() => (localStorage.getItem('runway_theme') ?? 'dark') === 'dark');
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', !dark);
+    document.documentElement.classList.toggle('dark', dark);
+  }, [dark]);
+
+  function handleLogout() {
+    auth.logout();
+    navigate('/login');
+  }
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3 bg-runway-bg/60 backdrop-blur-xl border-b border-runway-border/60">
@@ -66,9 +83,49 @@ export function TopBar() {
         </Tabs>
 
         <NotificationsBell />
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-runway-accent/80 to-runway-accent2/60 flex items-center justify-center text-white text-xs font-semibold shadow-glow ring-1 ring-white/10">
-          DF
-        </div>
+        <DataAsOf />
+
+        <Switch
+          aria-label="Theme toggle"
+          size="sm"
+          isSelected={!dark}
+          onChange={(e) => {
+            const next = !e.target.checked;
+            setDark(next);
+            localStorage.setItem('runway_theme', next ? 'dark' : 'light');
+          }}
+          thumbIcon={({ isSelected, className }) =>
+            isSelected ? <Sun className={className} size={12} /> : <Moon className={className} size={12} />}
+          classNames={{
+            wrapper: 'group-data-[selected=true]:bg-runway-accent',
+          }}
+        />
+
+        <Dropdown placement="bottom-end">
+          <DropdownTrigger>
+            <button
+              aria-label="Account menu"
+              className="w-9 h-9 rounded-xl bg-gradient-to-br from-runway-accent/80 to-runway-accent2/60 flex items-center justify-center text-white text-xs font-semibold shadow-glow ring-1 ring-white/10 hover:ring-white/25 transition-all duration-200 cursor-pointer"
+            >
+              DF
+            </button>
+          </DropdownTrigger>
+          <DropdownMenu
+            aria-label="Account actions"
+            className="bg-runway-raised border border-runway-borderStrong rounded-xl text-runway-text"
+            itemClasses={{ base: 'data-[hover=true]:bg-white/[0.04] rounded-lg' }}
+          >
+            <DropdownItem key="profile" startContent={<UserRound size={14} />} onPress={() => navigate('/settings')}>
+              Profile
+            </DropdownItem>
+            <DropdownItem key="workspace" startContent={<Building2 size={14} />} onPress={() => navigate('/settings')}>
+              Workspace
+            </DropdownItem>
+            <DropdownItem key="logout" startContent={<LogOut size={14} />} className="text-runway-negative" onPress={handleLogout}>
+              Log out
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
       </div>
     </header>
   );

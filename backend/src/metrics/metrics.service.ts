@@ -11,6 +11,12 @@ export interface DerivedMetrics {
   revenueChurnPct: number | null;
   logoChurnPct: number | null;
   threeMoAvgBurn: number | null;
+  /** Net burn multiple: (annualized net-new MRR) / net burn. >1 means growth outpaces burn. */
+  burnMultiple: number | null;
+  /** Rule of 40 score: annualized MoM growth rate + profit margin %. >=40 = healthy SaaS. */
+  ruleOf40: number | null;
+  /** Quick ratio: (new + expansion MRR) / (churned + contraction MRR). >=4 = healthy SaaS. */
+  quickRatio: number | null;
 }
 
 const REQUIRED_CSV_COLUMNS = [
@@ -39,6 +45,10 @@ export class MetricsService {
     return this.repo.upsert(input);
   }
 
+  deleteSnapshot(companyId: string, month: Date) {
+    return this.repo.delete(companyId, month);
+  }
+
   /** Computes runway, NRR, MoM growth, and churn splits for one point in the series using trailing context. */
   private deriveForIndex(all: SnapshotInput[], idx: number, greenMonths: number, yellowMonths: number): DerivedMetrics {
     const current = all[idx];
@@ -65,7 +75,27 @@ export class MetricsService {
     const priorTotal = prior ? prior.totalCustomers : current.totalCustomers - current.newCustomers + current.churnedCustomers;
     const logoChurnPct = priorTotal > 0 ? Math.round((current.churnedCustomers / priorTotal) * 1000) / 10 : null;
 
-    return { runwayMonths, runwayZone, nrr, momGrowthRate, revenueChurnPct, logoChurnPct, threeMoAvgBurn };
+    // Burn multiple: how much each net-dollar burned buys in annualized net-new MRR.
+    // Positive = revenue engine outpacing spend, >3 is strong for seed-stage.
+    const netNewMrrAnnualized = (current.mrr - (prior?.mrr ?? 0)) * 12;
+    const burnMultiple = netNewMrrAnnualized > 0 && avgBurn > 0
+      ? Math.round((netNewMrrAnnualized / avgBurn) * 100) / 100
+      : null;
+
+    // Rule of 40: annualized growth + profit margin. >40 = growth efficiency benchmark.
+    const annualizedGrowth = momGrowthRate !== null ? momGrowthRate * 12 : null;
+    const profitMarginPct = current.mrr > 0 ? ((current.mrr - current.burnRate) / current.mrr) * 100 : null;
+    const ruleOf40 =
+      annualizedGrowth !== null && profitMarginPct !== null
+        ? Math.round((annualizedGrowth + profitMarginPct) * 100) / 100
+        : null;
+
+    // Quick ratio: revenue gained vs revenue lost. >4 = healthy SaaS benchmark.
+    const gained = current.newMrr + current.expansionMrr;
+    const lost = current.churnedMrr + current.contractionMrr;
+    const quickRatio = lost > 0 ? Math.round((gained / lost) * 100) / 100 : null;
+
+    return { runwayMonths, runwayZone, nrr, momGrowthRate, revenueChurnPct, logoChurnPct, threeMoAvgBurn, burnMultiple, ruleOf40, quickRatio };
   }
 
   /** Parses + validates a CSV upload, returning a preview (parsed rows + errors) without committing. */

@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, GitCompare, Command, Rocket,
+  SlidersHorizontal, UserCog, Activity, Plug, CreditCard, KeyRound,
 } from 'lucide-react';
 
 const links = [
@@ -10,11 +11,17 @@ const links = [
   { to: '/metrics', label: 'Metrics', icon: TrendingUp },
   { to: '/import', label: 'Import', icon: Upload },
   { to: '/compare', label: 'Compare', icon: GitCompare },
+  { to: '/scenarios', label: 'Scenarios', icon: SlidersHorizontal },
   { to: '/investor-update', label: 'Investor Update', icon: FileText },
 ];
 
 const secondaryLinks = [
   { to: '/invites', label: 'Investor Invites', icon: UserPlus },
+  { to: '/team', label: 'Team', icon: UserCog },
+  { to: '/activity', label: 'Activity', icon: Activity },
+  { to: '/integrations', label: 'Integrations', icon: Plug },
+  { to: '/billing', label: 'Billing', icon: CreditCard },
+  { to: '/api-keys', label: 'API Keys', icon: KeyRound },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

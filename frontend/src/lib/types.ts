@@ -6,6 +6,9 @@ export interface DerivedMetrics {
   revenueChurnPct: number | null;
   logoChurnPct: number | null;
   threeMoAvgBurn: number | null;
+  burnMultiple: number | null;
+  ruleOf40: number | null;
+  quickRatio: number | null;
 }
 
 export interface Snapshot {
@@ -36,6 +39,7 @@ export interface CohortRow {
   size: number;
   logoRetention: number[];
   revenueRetention: number[];
+  cumulativeRevenue: number[];
 }
 
 export interface CompanySummary {

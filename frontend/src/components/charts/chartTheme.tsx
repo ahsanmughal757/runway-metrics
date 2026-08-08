@@ -34,20 +34,29 @@ export function ChartTooltip({
   payload,
   label,
   formatter,
+  labelFormatter,
+  note,
 }: {
   active?: boolean;
   payload?: TooltipEntry[];
   label?: string;
   formatter?: (value: number) => string;
+  labelFormatter?: (label: string) => string;
+  note?: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
+  const renderedLabel = labelFormatter
+    ? labelFormatter(label as string)
+    : typeof label === 'number'
+      ? label
+      : monthLabel(label as string);
   return (
     <div
       className="min-w-[10rem] rounded-xl border border-runway-borderStrong/80 bg-runway-raised/95 px-3.5 py-2.5 backdrop-blur-xl"
       style={{ boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}
     >
       <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-runway-muted">
-        {typeof label === 'number' ? label : monthLabel(label as string)}
+        {renderedLabel}
       </p>
       {payload.map((p, i) => (
         <div key={`${String(p.dataKey)}-${i}`} className="flex items-center justify-between gap-5 py-0.5">
@@ -60,6 +69,12 @@ export function ChartTooltip({
           </span>
         </div>
       ))}
+      {note && (
+        <>
+          <div className="my-1.5 h-px bg-runway-border/60" />
+          <p className="text-xs text-runway-amber leading-relaxed">{note}</p>
+        </>
+      )}
     </div>
   );
 }

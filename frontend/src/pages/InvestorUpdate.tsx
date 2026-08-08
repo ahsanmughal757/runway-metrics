@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Input, Textarea } from '@heroui/react';
-import { FileDown, Lock } from 'lucide-react';
+import { FileDown, Link2, Lock } from 'lucide-react';
+import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
 import { EmptyState } from '../components/EmptyState';
@@ -31,6 +32,20 @@ export function InvestorUpdate() {
     new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
   );
   const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function copyInvestorLink() {
+    try {
+      const { token } = await api.post<{ token: string }>('/reports/share-link');
+      const url = `${window.location.origin}/share/${token}`;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      push('Link copied.', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      push((e as Error).message, 'error');
+    }
+  }
 
   async function exportPdf() {
     setGenerating(true);
@@ -130,6 +145,18 @@ export function InvestorUpdate() {
         <Button color="primary" size="sm" isLoading={generating} onPress={exportPdf} startContent={!generating && <FileDown size={14} />} className="bg-accent-gradient font-medium">
           {generating ? 'Generating…' : 'Export PDF'}
         </Button>
+        <Button
+          size="sm"
+          variant="bordered"
+          onPress={copyInvestorLink}
+          startContent={<Link2 size={14} />}
+          className="ml-2 border-runway-border text-runway-text"
+        >
+          {copied ? 'Link copied!' : 'Copy investor link'}
+        </Button>
+        <p className="text-[11px] text-runway-muted mt-2">
+          Share link opens a read-only view of KPI cards and the MRR chart — no login required, token expires in 7 days.
+        </p>
       </div>
     </motion.div>
   );

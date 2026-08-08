@@ -12,8 +12,15 @@ const InvestorUpdate = lazy(() => import('./pages/InvestorUpdate').then((m) => (
 const Compare = lazy(() => import('./pages/Compare').then((m) => ({ default: m.Compare })));
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
 const Invites = lazy(() => import('./pages/Invites').then((m) => ({ default: m.Invites })));
+const Scenarios = lazy(() => import('./pages/Scenarios').then((m) => ({ default: m.Scenarios })));
+const Integrations = lazy(() => import('./pages/Integrations').then((m) => ({ default: m.Integrations })));
+const Billing = lazy(() => import('./pages/Billing').then((m) => ({ default: m.Billing })));
+const ApiKeys = lazy(() => import('./pages/ApiKeys').then((m) => ({ default: m.ApiKeys })));
+const Team = lazy(() => import('./pages/Team').then((m) => ({ default: m.Team })));
+const Activity = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Activity })));
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
 const Signup = lazy(() => import('./pages/Signup').then((m) => ({ default: m.Signup })));
+const ShareView = lazy(() => import('./pages/ShareView').then((m) => ({ default: m.ShareView })));
 
 function PageFallback() {
   return (
@@ -30,6 +37,7 @@ function AuthPageFallback() {
 export default function App() {
   const { pathname } = useLocation();
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
+  const isPublicRoute = pathname.startsWith('/share');
 
   if (isAuthRoute) {
     return (
@@ -37,6 +45,16 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+        </Routes>
+      </Suspense>
+    );
+  }
+
+  if (isPublicRoute) {
+    return (
+      <Suspense fallback={<AuthPageFallback />}>
+        <Routes>
+          <Route path="/share/:token" element={<ShareView />} />
         </Routes>
       </Suspense>
     );
@@ -51,8 +69,14 @@ export default function App() {
           <Route path="/metrics" element={<Metrics />} />
           <Route path="/import" element={<Import />} />
           <Route path="/compare" element={<Compare />} />
+          <Route path="/scenarios" element={<Scenarios />} />
           <Route path="/investor-update" element={<InvestorUpdate />} />
           <Route path="/invites" element={<Invites />} />
+          <Route path="/team" element={<Team />} />
+          <Route path="/activity" element={<Activity />} />
+          <Route path="/integrations" element={<Integrations />} />
+          <Route path="/billing" element={<Billing />} />
+          <Route path="/api-keys" element={<ApiKeys />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Suspense>

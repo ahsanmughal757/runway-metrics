@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { CommandPalette } from './CommandPalette';
+import { ShortcutsPanel } from './ShortcutsPanel';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useCompany } from '../lib/CompanyContext';
 
@@ -44,6 +45,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
       <CommandPalette />
+      <ShortcutsPanel />
     </div>
   );
 }

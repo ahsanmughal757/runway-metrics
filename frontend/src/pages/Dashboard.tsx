@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type MutableRefObject } from 'react';
 import { motion } from 'framer-motion';
-import { Button } from '@heroui/react';
+import { Button, Select, SelectItem } from '@heroui/react';
 import { DollarSign, TrendingDown, Flame, Gauge, Upload, PlusCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
@@ -10,10 +10,16 @@ import { CountUp } from '../components/CountUp';
 import { KpiCardSkeleton, ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { MrrTrendChart } from '../components/charts/MrrTrendChart';
+import { MrrWaterfallChart } from '../components/charts/MrrWaterfallChart';
 import { ChurnTrendChart } from '../components/charts/ChurnTrendChart';
 import { BurnCashChart } from '../components/charts/BurnCashChart';
 import { NrrChart } from '../components/charts/NrrChart';
 import { MomGrowthChart } from '../components/charts/MomGrowthChart';
+import { BurnMultipleChart } from '../components/charts/BurnMultipleChart';
+import { RuleOf40Chart } from '../components/charts/RuleOf40Chart';
+import { QuickRatioChart } from '../components/charts/QuickRatioChart';
+import { BenchmarkChart } from '../components/charts/BenchmarkChart';
+import { ChartExportButton } from '../components/charts/ChartExportButton';
 import { monthLabel } from '../components/charts/chartTheme';
 
 function fmtCurrency(n: number) {
@@ -28,6 +34,7 @@ export function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const [range, setRange] = useState<'6' | '12' | '24' | 'all'>('12');
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -57,6 +64,8 @@ export function Dashboard() {
   const { latest, snapshots } = data;
   if (!latest) return <EmptyDashboard />;
 
+  const chartSnapshots = range === 'all' ? snapshots : snapshots.slice(-Number(range));
+
   const zone = latest.derived.runwayZone;
 
   return (
@@ -78,6 +87,24 @@ export function Dashboard() {
             <span className="w-1.5 h-1.5 rounded-full bg-runway-positive animate-pulse-dot" />
             <span className="text-xs text-runway-muted">Live data</span>
           </div>
+          <Select
+            aria-label="Date range"
+            size="sm"
+            variant="bordered"
+            className="w-32"
+            selectedKeys={[range]}
+            onSelectionChange={(keys) => setRange(Array.from(keys)[0] as typeof range)}
+            classNames={{
+              trigger: 'bg-white/[0.02] border-runway-border/70 rounded-xl shadow-soft',
+              popoverContent: 'bg-runway-raised border border-runway-borderStrong rounded-xl shadow-raised',
+              listbox: 'text-runway-text',
+            }}
+          >
+            <SelectItem key="6">6 months</SelectItem>
+            <SelectItem key="12">12 months</SelectItem>
+            <SelectItem key="24">24 months</SelectItem>
+            <SelectItem key="all">All time</SelectItem>
+          </Select>
         </div>
       </motion.div>
 
@@ -121,7 +148,13 @@ export function Dashboard() {
 
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <ChartCard id={sectionIds.mrr} title="MRR Trend" refs={refs} highlighted={highlighted}>
-          <MrrTrendChart snapshots={snapshots} />
+          <MrrTrendChart snapshots={chartSnapshots} />
+        </ChartCard>
+      </motion.div>
+
+      <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
+        <ChartCard id="chart-waterfall" title="MRR Waterfall" refs={refs} highlighted={highlighted}>
+          <MrrWaterfallChart snapshots={chartSnapshots} />
         </ChartCard>
       </motion.div>
 
@@ -129,22 +162,42 @@ export function Dashboard() {
       <motion.div className="grid md:grid-cols-12 gap-6" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <div className="md:col-span-7">
           <ChartCard id={sectionIds.burn} title="Burn vs. Cash Balance" refs={refs} highlighted={highlighted}>
-            <BurnCashChart snapshots={snapshots} />
+            <BurnCashChart snapshots={chartSnapshots} />
+          </ChartCard>
+        </div>
+        <div className="md:col-span-5">
+          <ChartCard id="chart-burn-multiple" title="Burn Multiple" refs={refs} highlighted={highlighted}>
+            <BurnMultipleChart snapshots={chartSnapshots} />
+          </ChartCard>
+        </div>
+        <div className="md:col-span-7">
+          <ChartCard id="chart-rule-of-40" title="Rule of 40" refs={refs} highlighted={highlighted}>
+            <RuleOf40Chart snapshots={chartSnapshots} />
+          </ChartCard>
+        </div>
+        <div className="md:col-span-5">
+          <ChartCard id="chart-quick-ratio" title="Quick Ratio" refs={refs} highlighted={highlighted}>
+            <QuickRatioChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-5">
           <ChartCard id={sectionIds.churn} title="Churn % Trend" refs={refs} highlighted={highlighted}>
-            <ChurnTrendChart snapshots={snapshots} />
+            <ChurnTrendChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
-        <div className="md:col-span-5">
+        <div className="md:col-span-7">
           <ChartCard id={sectionIds.nrr} title="Net Revenue Retention" refs={refs} highlighted={highlighted}>
-            <NrrChart snapshots={snapshots} />
+            <NrrChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-7">
           <ChartCard id={sectionIds.mom} title="MoM Growth Rate" refs={refs} highlighted={highlighted}>
-            <MomGrowthChart snapshots={snapshots} />
+            <MomGrowthChart snapshots={chartSnapshots} />
+          </ChartCard>
+        </div>
+        <div className="md:col-span-5">
+          <ChartCard id="chart-benchmarks" title="Benchmarks" refs={refs} highlighted={highlighted}>
+            <BenchmarkChart />
           </ChartCard>
         </div>
       </motion.div>
@@ -155,6 +208,7 @@ export function Dashboard() {
 function ChartCard({
   id, title, children, refs, highlighted,
 }: { id: string; title: string; children: ReactNode; refs: MutableRefObject<Record<string, HTMLDivElement | null>>; highlighted: string | null }) {
+  const chartRef = useRef<HTMLDivElement>(null);
   return (
     <div ref={(el) => (refs.current[id] = el)}>
       <div
@@ -170,8 +224,11 @@ function ChartCard({
             }`}
           />
           <h3 className="text-sm font-semibold text-runway-text">{title}</h3>
+          <div className="ml-auto">
+            <ChartExportButton targetRef={chartRef} />
+          </div>
         </div>
-        <div className="relative px-2 pb-3">{children}</div>
+        <div ref={chartRef} className="relative px-2 pb-3">{children}</div>
       </div>
     </div>
   );

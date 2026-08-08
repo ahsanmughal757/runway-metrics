@@ -55,4 +55,46 @@ export class AuditService {
     }
     return demoFeed[companyId] ?? [];
   }
+
+  /** Paginated + optionally entityType-filtered feed for the full Activity page. */
+  async list(companyId: string, opts: { page?: number; pageSize?: number; entityType?: string }): Promise<{ items: ActivityItem[]; total: number; page: number; pageSize: number }> {
+    const page = Math.max(1, opts.page ?? 1);
+    const pageSize = Math.min(50, Math.max(1, opts.pageSize ?? 15));
+    const entityType = opts.entityType || undefined;
+
+    if (env.ENABLE_DATABASE) {
+      const where = { companyId, ...(entityType ? { entityType } : {}) };
+      const [rows, total] = await Promise.all([
+        this.prisma.auditLog.findMany({
+          where,
+          orderBy: { changedAt: 'desc' },
+          skip: (page - 1) * pageSize,
+          take: pageSize,
+          include: { user: true },
+        }),
+        this.prisma.auditLog.count({ where }),
+      ]);
+      return {
+        items: rows.map((r) => ({
+          id: r.id,
+          entityType: r.entityType,
+          action: r.action,
+          changedBy: r.user?.name ?? r.user?.email ?? r.changedBy,
+          changedAt: r.changedAt.toISOString(),
+        })),
+        total,
+        page,
+        pageSize,
+      };
+    }
+
+    let feed = demoFeed[companyId] ?? [];
+    if (entityType) feed = feed.filter((i) => i.entityType === entityType);
+    return {
+      items: feed.slice((page - 1) * pageSize, page * pageSize),
+      total: feed.length,
+      page,
+      pageSize,
+    };
+  }
 }

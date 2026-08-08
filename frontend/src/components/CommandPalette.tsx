@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, Search,
+  LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, Search, SlidersHorizontal,
+  UserCog, Activity, Plug, CreditCard, KeyRound,
 } from 'lucide-react';
 
 interface Command {
@@ -18,8 +19,14 @@ const commands: Command[] = [
   { id: 'cohorts', label: 'Go to Cohorts', icon: Users, action: (nav) => nav('/cohorts') },
   { id: 'metrics', label: 'Go to Metrics', icon: TrendingUp, action: (nav) => nav('/metrics') },
   { id: 'import', label: 'Go to Import', icon: Upload, action: (nav) => nav('/import') },
+  { id: 'scenarios', label: 'Model Runway Scenarios', icon: SlidersHorizontal, action: (nav) => nav('/scenarios') },
   { id: 'report', label: 'Build Investor Update', icon: FileText, action: (nav) => nav('/investor-update') },
   { id: 'invites', label: 'Invite an Investor', icon: UserPlus, action: (nav) => nav('/invites') },
+  { id: 'team', label: 'View Team', icon: UserCog, action: (nav) => nav('/team') },
+  { id: 'activity', label: 'View Activity', icon: Activity, action: (nav) => nav('/activity') },
+  { id: 'integrations', label: 'Browse Integrations', icon: Plug, action: (nav) => nav('/integrations') },
+  { id: 'billing', label: 'View Billing', icon: CreditCard, action: (nav) => nav('/billing') },
+  { id: 'api-keys', label: 'Manage API Keys', icon: KeyRound, action: (nav) => nav('/api-keys') },
   { id: 'compare', label: 'Compare Companies', icon: TrendingUp, action: (nav) => nav('/compare') },
   { id: 'settings', label: 'Open Settings', icon: Settings, action: (nav) => nav('/settings') },
 ];

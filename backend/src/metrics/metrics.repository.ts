@@ -91,6 +91,14 @@ export class MetricsRepository {
     }
     return rows.length; // demo mode: report what would have been imported
   }
+
+  async delete(companyId: string, month: Date): Promise<boolean> {
+    if (env.ENABLE_DATABASE) {
+      const res = await this.prisma.metricSnapshot.deleteMany({ where: { companyId, month } });
+      return res.count > 0;
+    }
+    return true; // demo mode: acknowledge the delete
+  }
 }
 
 function toSnapshotInput(row: any): SnapshotInput {
