@@ -9,6 +9,7 @@ interface CompanyContextValue {
   role: 'FOUNDER' | 'INVESTOR';
   setRole: (r: 'FOUNDER' | 'INVESTOR') => void;
   loading: boolean;
+  error: string | null;
 }
 
 const CompanyContext = createContext<CompanyContextValue | null>(null);
@@ -20,6 +21,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   // Real enforcement always happens server-side via RolesGuard regardless of this value.
   const [role, setRole] = useState<'FOUNDER' | 'INVESTOR'>('FOUNDER');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -30,6 +32,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         setActiveCompanyId(first);
         if (first) localStorage.setItem('runway_demo_company_id', first);
       })
+      .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, []);
 
@@ -45,7 +48,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
   return (
     <CompanyContext.Provider
-      value={{ companies, activeCompanyId, setActiveCompanyId: updateActiveCompanyId, role, setRole: updateRole, loading }}
+      value={{ companies, activeCompanyId, setActiveCompanyId: updateActiveCompanyId, role, setRole: updateRole, loading, error }}
     >
       {children}
     </CompanyContext.Provider>

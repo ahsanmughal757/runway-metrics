@@ -27,7 +27,10 @@ export function Import() {
     reader.onload = () => {
       const text = String(reader.result ?? '');
       setCsvText(text);
-      api.post<PreviewResponse>('/metrics/import/preview', { csv: text }).then(setPreview);
+      api
+        .post<PreviewResponse>('/metrics/import/preview', { csv: text })
+        .then(setPreview)
+        .catch((e) => push((e as Error).message, 'error'));
     };
     reader.readAsText(file);
   }
