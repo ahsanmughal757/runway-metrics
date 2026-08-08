@@ -14,6 +14,7 @@
     "lint": "eslint \"src/**/*.ts\""
   },
   "dependencies": {
+    "@faker-js/faker": "^9.0.0",
     "@nestjs/common": "^10.4.0",
     "@nestjs/config": "^3.2.3",
     "@nestjs/core": "^10.4.0",
@@ -30,8 +31,7 @@
     "passport-jwt": "^4.0.1",
     "react": "^18.3.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
-    "@faker-js/faker": "^9.0.0"
+    "rxjs": "^7.8.1"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",
@@ -41,6 +41,7 @@
     "@types/node": "^22.5.4",
     "@types/papaparse": "^5.3.14",
     "@types/passport-jwt": "^4.0.1",
+    "@types/react": "^18.3.31",
     "prisma": "^5.19.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"

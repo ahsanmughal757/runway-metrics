@@ -8,7 +8,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { MetricsService } from '../metrics/metrics.service';
 import { CompaniesRepository } from '../companies/companies.repository';
-import { renderInvestorUpdatePdf } from './investor-update.pdf.tsx';
+import { renderInvestorUpdatePdf } from './investor-update.pdf';
 
 class NarrativeSectionDto {
   @IsString() heading!: string;
