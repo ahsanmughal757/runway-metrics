@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Card, CardBody, CardHeader, Select, SelectItem } from '@heroui/react';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Select, SelectItem } from '@heroui/react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { GitCompare } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
 import { DashboardResponse } from '../lib/types';
-import { axisTickStyle, chartColors, monthLabel } from '../components/charts/chartTheme';
+import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from '../components/charts/chartTheme';
 import { ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 
@@ -91,7 +91,11 @@ export function Compare() {
           className="w-64"
           selectedKeys={comparePersona ? [comparePersona] : []}
           onSelectionChange={(keys) => setComparePersona(Array.from(keys)[0] as string)}
-          classNames={{ trigger: 'border-runway-border bg-runway-surface' }}
+          classNames={{
+            trigger: 'bg-white/[0.02] border-runway-border/70 rounded-xl shadow-soft',
+            popoverContent: 'bg-runway-raised border border-runway-borderStrong rounded-xl shadow-raised',
+            listbox: 'text-runway-text',
+          }}
         >
           {options.map((o) => (
             <SelectItem key={o.key}>{o.label}</SelectItem>
@@ -108,25 +112,48 @@ export function Compare() {
       )}
 
       {!unavailable && (
-        <Card className="bg-runway-surface border border-runway-border">
-          <CardHeader className="text-sm font-medium text-runway-text">MRR — this company vs. {compareLabel || '…'}</CardHeader>
-          <CardBody>
+        <div className="runway-card overflow-hidden">
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-3">
+            <h3 className="text-sm font-semibold text-runway-text">MRR — this company vs. {compareLabel || '…'}</h3>
+            <div className="flex items-center gap-4 text-[11px] text-runway-muted">
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-4 rounded-full bg-runway-accent" /> This company
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-4 rounded-full bg-runway-amber" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #f6b93b 0 4px, transparent 4px 7px)' }} /> {compareLabel}
+              </span>
+            </div>
+          </div>
+          <div className="relative px-2 pb-3">
             <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={merged} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={{ stroke: '#242f4d' }} tickLine={false} />
-                <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={50} />
-                <Tooltip
-                  labelFormatter={monthLabel}
-                  formatter={(v: number) => `$${v.toLocaleString()}`}
-                  contentStyle={{ background: '#182142', border: '1px solid #334066', borderRadius: 8, fontSize: 12 }}
+              <LineChart data={merged} margin={{ top: 10, right: 14, left: 0, bottom: 0 }}>
+                <CartesianGrid {...gridStyle} />
+                <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+                <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
+                <Tooltip content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
+                <Line
+                  type="monotone"
+                  dataKey="ownMrr"
+                  name="This company"
+                  stroke={chartColors.accent}
+                  strokeWidth={2.5}
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.accent, strokeWidth: 2.5 }}
                 />
-                <Legend wrapperStyle={{ fontSize: 11, color: chartColors.muted }} />
-                <Line type="monotone" dataKey="ownMrr" name="This company" stroke={chartColors.accent} strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="compareMrr" name={compareLabel} stroke="#f2b84b" strokeWidth={2} strokeDasharray="5 3" dot={false} />
+                <Line
+                  type="monotone"
+                  dataKey="compareMrr"
+                  name={compareLabel}
+                  stroke={chartColors.amber}
+                  strokeWidth={2.5}
+                  strokeDasharray="5 3"
+                  dot={false}
+                  activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.amber, strokeWidth: 2.5 }}
+                />
               </LineChart>
             </ResponsiveContainer>
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );

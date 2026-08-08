@@ -1,6 +1,6 @@
 import { ChangeEvent, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Button, Card, CardBody } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { UploadCloud, FileCheck2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useToast } from '../lib/ToastContext';
@@ -56,33 +56,40 @@ export function Import() {
   return (
     <motion.div className="flex flex-col gap-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
       <div>
-        <h2 className="text-lg font-medium text-runway-text">CSV Import</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-runway-text">CSV Import</h2>
         <p className="text-sm text-runway-muted">
           Columns required: month, mrr, newMrr, expansionMrr, contractionMrr, churnedMrr, newCustomers,
           churnedCustomers, totalCustomers, burnRate, cash.
         </p>
       </div>
 
-      <Card
-        isPressable
-        onPress={() => fileInputRef.current?.click()}
-        className="bg-runway-surface border border-dashed border-runway-border hover:border-runway-accent/60 transition-colors"
+      <div
+        className="runway-card cursor-pointer transition-all duration-300 hover:border-runway-accent/40 hover:shadow-glow"
+        onClick={() => fileInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
       >
-        <CardBody className="p-10 flex flex-col items-center justify-center gap-2">
-          <div className="w-11 h-11 rounded-full bg-runway-accent/10 flex items-center justify-center mb-1">
-            {fileName ? <FileCheck2 size={20} className="text-runway-positive" /> : <UploadCloud size={20} className="text-runway-accent" />}
+        <div className="runway-sheen" />
+        <div className="relative p-12 flex flex-col items-center justify-center gap-3">
+          <div className="relative">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-runway-accent/[0.16] to-runway-accent2/[0.08] border border-runway-accent/20 flex items-center justify-center">
+              {fileName ? <FileCheck2 size={22} className="text-runway-positive" /> : <UploadCloud size={22} className="text-runway-accent" />}
+            </div>
+            <div className="absolute inset-0 rounded-2xl bg-runway-accent/10 blur-xl -z-10" />
           </div>
-          <span className="text-runway-text text-sm">{fileName ?? 'Drop a CSV file here or click to browse'}</span>
+          <span className="text-runway-text text-sm font-medium">{fileName ?? 'Drop a CSV file here or click to browse'}</span>
           <span className="text-runway-muted text-xs">Generate a sample file via scripts/generate-csv.ts on the backend</span>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
       <input ref={fileInputRef} type="file" accept=".csv" onChange={onFile} className="hidden" />
 
       {preview && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="bg-runway-surface border border-runway-border">
-            <CardBody className="flex flex-col gap-3">
-              <h3 className="text-sm font-medium text-runway-text">
+          <div className="runway-card p-5">
+            <div className="runway-sheen" />
+            <div className="relative flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-runway-text">
                 Preview — {preview.rowCount} row(s) {preview.errors.length > 0 && `· ${preview.errors.length} error(s)`}
               </h3>
               {preview.errors.length > 0 ? (
@@ -92,12 +99,12 @@ export function Import() {
                   ))}
                 </ul>
               ) : (
-                <Button color="primary" size="sm" className="w-fit" isLoading={committing} onPress={commit}>
+                <Button color="primary" size="sm" className="w-fit bg-accent-gradient font-medium" isLoading={committing} onPress={commit}>
                   {committing ? 'Importing…' : 'Confirm & commit'}
                 </Button>
               )}
-            </CardBody>
-          </Card>
+            </div>
+          </div>
         </motion.div>
       )}
     </motion.div>

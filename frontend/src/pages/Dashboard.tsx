@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type MutableRefObject } from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardBody, CardHeader, Button } from '@heroui/react';
+import { Button } from '@heroui/react';
 import { DollarSign, TrendingDown, Flame, Gauge, Upload, PlusCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
@@ -14,6 +14,7 @@ import { ChurnTrendChart } from '../components/charts/ChurnTrendChart';
 import { BurnCashChart } from '../components/charts/BurnCashChart';
 import { NrrChart } from '../components/charts/NrrChart';
 import { MomGrowthChart } from '../components/charts/MomGrowthChart';
+import { monthLabel } from '../components/charts/chartTheme';
 
 function fmtCurrency(n: number) {
   return `$${n.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
@@ -49,9 +50,7 @@ export function Dashboard() {
   if (loading) return <DashboardSkeleton />;
   if (error)
     return (
-      <Card className="bg-runway-surface border border-runway-border">
-        <CardBody className="text-runway-negative text-sm">{error}</CardBody>
-      </Card>
+      <div className="runway-card p-5 text-sm text-runway-negative border-runway-negative/30">{error}</div>
     );
   if (!data || data.snapshots.length === 0) return <EmptyDashboard />;
 
@@ -67,6 +66,21 @@ export function Dashboard() {
       animate="show"
       variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
     >
+      <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-runway-text">Overview</h2>
+            <p className="text-sm text-runway-muted mt-0.5">
+              Your company at a glance — last snapshot {monthLabel(data.snapshots[data.snapshots.length - 1].month)}.
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 rounded-full border border-runway-border/70 bg-white/[0.02] px-3 py-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-runway-positive animate-pulse-dot" />
+            <span className="text-xs text-runway-muted">Live data</span>
+          </div>
+        </div>
+      </motion.div>
+
       <motion.div
         className="grid grid-cols-2 md:grid-cols-4 gap-4"
         variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
@@ -143,14 +157,22 @@ function ChartCard({
 }: { id: string; title: string; children: ReactNode; refs: MutableRefObject<Record<string, HTMLDivElement | null>>; highlighted: string | null }) {
   return (
     <div ref={(el) => (refs.current[id] = el)}>
-      <Card
-        className={`bg-runway-surface border transition-shadow duration-300 ${
-          highlighted === id ? 'border-runway-accent shadow-[0_0_0_3px_rgba(91,140,255,0.25)]' : 'border-runway-border'
+      <div
+        className={`runway-card transition-all duration-300 ${
+          highlighted === id ? 'border-runway-accent/50 shadow-glow' : ''
         }`}
       >
-        <CardHeader className="text-sm font-medium text-runway-text pb-0">{title}</CardHeader>
-        <CardBody>{children}</CardBody>
-      </Card>
+        <div className="runway-sheen" />
+        <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-1">
+          <span
+            className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+              highlighted === id ? 'bg-runway-accent animate-pulse-dot' : 'bg-runway-borderStrong'
+            }`}
+          />
+          <h3 className="text-sm font-semibold text-runway-text">{title}</h3>
+        </div>
+        <div className="relative px-2 pb-3">{children}</div>
+      </div>
     </div>
   );
 }

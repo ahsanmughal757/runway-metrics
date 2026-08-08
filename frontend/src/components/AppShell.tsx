@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
-import { Card, CardBody } from '@heroui/react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 import { CommandPalette } from './CommandPalette';
@@ -13,19 +12,24 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { error } = useCompany();
 
   return (
-    <div className="flex min-h-screen bg-runway-bg">
+    <div className="relative flex min-h-screen">
+      {/* Ambient background glows that sit behind the whole app */}
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+        <div className="absolute -top-32 left-[12%] w-[34rem] h-[34rem] rounded-full bg-runway-accent/[0.07] blur-[120px]" />
+        <div className="absolute top-[42%] -right-40 w-[30rem] h-[30rem] rounded-full bg-runway-accent2/[0.06] blur-[130px]" />
+        <div className="absolute bottom-[-12rem] left-[35%] w-[28rem] h-[28rem] rounded-full bg-runway-positive/[0.05] blur-[120px]" />
+      </div>
+
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="relative z-10 flex-1 flex flex-col min-w-0">
         <TopBar />
-        <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-6">
+        <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-7">
           <ErrorBoundary>
             {error ? (
-              <Card className="bg-runway-surface border border-runway-border">
-                <CardBody className="text-runway-negative text-sm">
-                  Failed to load company data: {error}. Check that the backend is running (see README: demo mode needs
-                  BYPASS_AUTH=true).
-                </CardBody>
-              </Card>
+              <div className="runway-card p-5 text-sm text-runway-negative border-runway-negative/30">
+                Failed to load company data: {error}. Check that the backend is running (see README: demo mode needs
+                BYPASS_AUTH=true).
+              </div>
             ) : (
               <motion.div
                 key={pathname}

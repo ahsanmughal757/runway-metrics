@@ -42,11 +42,11 @@ export function NotificationsBell() {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Notifications"
-        className="relative w-9 h-9 rounded-md border border-runway-border bg-runway-surface flex items-center justify-center text-runway-muted hover:text-runway-text transition-colors"
+        className="relative w-9 h-9 rounded-xl border border-runway-border/70 bg-white/[0.02] flex items-center justify-center text-runway-muted hover:text-runway-text hover:border-runway-borderStrong transition-all duration-200"
       >
         <Bell size={16} />
         {items.length > 0 && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-runway-accent text-white text-[9px] flex items-center justify-center">
+          <span className="absolute -top-1.5 -right-1.5 min-w-[17px] h-[17px] px-1 rounded-full bg-accent-gradient text-white text-[9px] font-semibold flex items-center justify-center ring-2 ring-runway-bg">
             {items.length}
           </span>
         )}
@@ -60,10 +60,12 @@ export function NotificationsBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.97 }}
               transition={{ duration: 0.14 }}
-              className="absolute right-0 mt-2 w-80 bg-runway-raised border border-runway-borderStrong rounded-lg shadow-raised z-50 overflow-hidden"
+              className="absolute right-0 mt-2 w-80 overflow-hidden rounded-2xl border border-runway-borderStrong/80 bg-runway-raised/95 backdrop-blur-xl"
+              style={{ boxShadow: '0 20px 56px -14px rgba(0,0,0,0.75)' }}
             >
-              <div className="px-4 py-2.5 border-b border-runway-border">
-                <p className="text-sm font-medium text-runway-text">Activity</p>
+              <div className="px-4 py-3 border-b border-runway-border/70 flex items-center justify-between">
+                <p className="text-sm font-semibold text-runway-text">Activity</p>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-runway-muted">{items.length} events</span>
               </div>
               <div className="max-h-72 overflow-y-auto">
                 {items.length === 0 && (
@@ -72,11 +74,13 @@ export function NotificationsBell() {
                 {items.map((item) => {
                   const Icon = iconFor[item.entityType] ?? Bell;
                   return (
-                    <div key={item.id} className="flex items-start gap-2.5 px-4 py-2.5 border-b border-runway-border/50 last:border-0">
-                      <Icon size={14} className="text-runway-accent mt-0.5 shrink-0" />
+                    <div key={item.id} className="flex items-start gap-3 px-4 py-3 border-b border-runway-border/40 last:border-0 hover:bg-white/[0.02] transition-colors">
+                      <span className="w-7 h-7 rounded-lg bg-runway-accent/10 border border-runway-accent/20 flex items-center justify-center shrink-0 mt-0.5">
+                        <Icon size={13} className="text-runway-accent" />
+                      </span>
                       <div className="min-w-0">
-                        <p className="text-xs text-runway-text">
-                          <span className="font-medium">{item.changedBy}</span> {item.action}
+                        <p className="text-xs text-runway-text leading-relaxed">
+                          <span className="font-semibold">{item.changedBy}</span> <span className="text-runway-muted">{item.action}</span>
                         </p>
                         <p className="text-[11px] text-runway-muted mt-0.5">{timeAgo(item.changedAt)}</p>
                       </div>

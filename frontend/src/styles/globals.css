@@ -3,16 +3,53 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply font-body;
+  html {
+    @apply antialiased;
   }
-  .kpi-number {
-    @apply font-condensed;
+  body {
+    @apply font-body text-runway-text;
+    background-color: #0a0c12;
+    background-image:
+      radial-gradient(1000px 520px at 8% -8%, rgba(111, 124, 255, 0.1), transparent 60%),
+      radial-gradient(900px 500px at 106% -4%, rgba(167, 139, 250, 0.08), transparent 55%),
+      radial-gradient(900px 700px at 50% 115%, rgba(52, 211, 153, 0.045), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(111, 124, 255, 0.3);
+    color: #e8ecf5;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2b3449;
+    border-radius: 999px;
+    border: 2.5px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a4560;
+    background-clip: padding-box;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2b3449 transparent;
   }
 }
 
 @layer components {
   .runway-card {
-    @apply bg-runway-surface border border-runway-border rounded-lg;
+    @apply relative rounded-2xl border border-runway-border/70 bg-runway-surface shadow-soft;
+  }
+  /* Top hairline sheen shared by surfaced elements */
+  .runway-sheen::before {
+    content: '';
+    @apply pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-2xl;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Input, Slider } from '@heroui/react';
+import { Button, Input, Slider } from '@heroui/react';
 import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
 import { api } from '../lib/api';
@@ -13,7 +13,8 @@ interface CompanySettings {
 }
 
 const inputClassNames = {
-  inputWrapper: 'bg-runway-charcoal border border-runway-border data-[hover=true]:bg-runway-charcoal',
+  inputWrapper:
+    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
   label: 'text-runway-muted',
 };
 
@@ -48,13 +49,14 @@ export function Settings() {
   return (
     <div className="flex flex-col gap-6 max-w-xl">
       <div>
-        <h2 className="text-lg font-medium text-runway-text">Settings</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-runway-text">Settings</h2>
         <p className="text-sm text-runway-muted">Company profile and runway zone thresholds.</p>
       </div>
 
-      <Card className="bg-runway-surface border border-runway-border">
-        <CardHeader className="text-sm font-medium text-runway-text">Company Profile</CardHeader>
-        <CardBody className="flex flex-col gap-4">
+      <div className="runway-card overflow-hidden">
+        <div className="runway-sheen" />
+        <div className="relative px-5 pt-5 pb-5">
+          <h3 className="text-sm font-semibold text-runway-text mb-4">Company Profile</h3>
           <Input
             label="Company name"
             size="sm"
@@ -64,53 +66,56 @@ export function Settings() {
             isDisabled={!canEdit}
             classNames={inputClassNames}
           />
-        </CardBody>
-      </Card>
+        </div>
+      </div>
 
-      <Card className="bg-runway-surface border border-runway-border">
-        <CardHeader className="flex flex-col items-start gap-0.5">
-          <span className="text-sm font-medium text-runway-text">Runway Zone Thresholds</span>
-          <span className="text-xs text-runway-muted">Controls the 🟢/🟡/🔴 indicator on the dashboard runway card.</span>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-6 pt-2">
-          <div>
-            <div className="flex justify-between text-xs text-runway-muted mb-1.5">
-              <span>Green (healthy) at</span>
-              <span className="text-runway-positive">{settings.runwayGreenMonths} months+</span>
-            </div>
-            <Slider
-              size="sm"
-              minValue={settings.runwayYellowMonths + 1}
-              maxValue={24}
-              step={1}
-              value={settings.runwayGreenMonths}
-              onChange={(v) => setSettings({ ...settings, runwayGreenMonths: Array.isArray(v) ? v[0] : v })}
-              isDisabled={!canEdit}
-              color="success"
-            />
+      <div className="runway-card overflow-hidden">
+        <div className="runway-sheen" />
+        <div className="relative px-5 pt-5 pb-5">
+          <div className="flex flex-col items-start gap-0.5 mb-5">
+            <span className="text-sm font-semibold text-runway-text">Runway Zone Thresholds</span>
+            <span className="text-xs text-runway-muted">Controls the zone indicator on the dashboard runway card.</span>
           </div>
-          <div>
-            <div className="flex justify-between text-xs text-runway-muted mb-1.5">
-              <span>Yellow (caution) at</span>
-              <span className="text-runway-amber">{settings.runwayYellowMonths} months+</span>
+          <div className="flex flex-col gap-6">
+            <div>
+              <div className="flex justify-between text-xs text-runway-muted mb-2">
+                <span>Green (healthy) at</span>
+                <span className="text-runway-positive font-semibold">{settings.runwayGreenMonths} months+</span>
+              </div>
+              <Slider
+                size="sm"
+                minValue={settings.runwayYellowMonths + 1}
+                maxValue={24}
+                step={1}
+                value={settings.runwayGreenMonths}
+                onChange={(v) => setSettings({ ...settings, runwayGreenMonths: Array.isArray(v) ? v[0] : v })}
+                isDisabled={!canEdit}
+                color="success"
+              />
             </div>
-            <Slider
-              size="sm"
-              minValue={0}
-              maxValue={Math.max(1, settings.runwayGreenMonths - 1)}
-              step={1}
-              value={settings.runwayYellowMonths}
-              onChange={(v) => setSettings({ ...settings, runwayYellowMonths: Array.isArray(v) ? v[0] : v })}
-              isDisabled={!canEdit}
-              color="warning"
-            />
+            <div>
+              <div className="flex justify-between text-xs text-runway-muted mb-2">
+                <span>Yellow (caution) at</span>
+                <span className="text-runway-amber font-semibold">{settings.runwayYellowMonths} months+</span>
+              </div>
+              <Slider
+                size="sm"
+                minValue={0}
+                maxValue={Math.max(1, settings.runwayGreenMonths - 1)}
+                step={1}
+                value={settings.runwayYellowMonths}
+                onChange={(v) => setSettings({ ...settings, runwayYellowMonths: Array.isArray(v) ? v[0] : v })}
+                isDisabled={!canEdit}
+                color="warning"
+              />
+            </div>
+            <p className="text-xs text-runway-muted">Below {settings.runwayYellowMonths} months shows red.</p>
           </div>
-          <p className="text-xs text-runway-muted">Below {settings.runwayYellowMonths} months shows red.</p>
-        </CardBody>
-      </Card>
+        </div>
+      </div>
 
       {canEdit && (
-        <Button color="primary" size="sm" className="w-fit" isLoading={saving} onPress={save}>
+        <Button color="primary" size="sm" className="w-fit bg-accent-gradient font-medium" isLoading={saving} onPress={save}>
           Save changes
         </Button>
       )}

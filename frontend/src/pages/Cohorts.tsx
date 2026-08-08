@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Card, CardBody } from '@heroui/react';
 import { Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
@@ -29,11 +28,7 @@ export function Cohorts() {
           Built on seeded demo data (v1) — real customer-level ingestion is planned for v2.
         </p>
       </div>
-      {error && (
-        <Card className="bg-runway-surface border border-runway-border">
-          <CardBody className="text-runway-negative text-sm">{error}</CardBody>
-        </Card>
-      )}
+      {error && <div className="runway-card p-5 text-sm text-runway-negative border-runway-negative/30">{error}</div>}
       {rows === null && !error && <ChartCardSkeleton height={320} />}
       {rows && rows.length > 0 && <CohortTable rows={rows} />}
       {rows && rows.length === 0 && (

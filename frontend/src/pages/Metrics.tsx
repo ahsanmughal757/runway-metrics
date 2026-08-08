@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import {
-  Button, Card, CardBody, CardHeader, Input,
+  Button, Input,
   Table, TableHeader, TableColumn, TableBody, TableRow, TableCell,
 } from '@heroui/react';
 import { Download } from 'lucide-react';
@@ -75,22 +75,24 @@ export function Metrics() {
   }
 
   const inputClassNames = {
-    inputWrapper: 'bg-runway-charcoal border border-runway-border data-[hover=true]:bg-runway-charcoal',
+    inputWrapper:
+      'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
     label: 'text-runway-muted',
   };
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-lg font-medium text-runway-text">Metrics Entry / History</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-runway-text">Metrics Entry / History</h2>
         <p className="text-sm text-runway-muted">
           {canEdit ? 'Add or edit monthly snapshots.' : 'Read-only in Investor view — editing is Founder-only, enforced server-side.'}
         </p>
       </div>
 
       {canEdit && (
-        <Card className="bg-runway-surface border border-runway-border">
-          <CardBody>
+        <div className="runway-card overflow-hidden">
+          <div className="runway-sheen" />
+          <div className="relative p-5">
             <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Input type="month" label="Month" size="sm" variant="bordered" classNames={inputClassNames}
                 value={form.month} onValueChange={(v) => setForm({ ...form, month: v })} isRequired />
@@ -116,38 +118,41 @@ export function Metrics() {
                 value={form.cash} onValueChange={(v) => setForm({ ...form, cash: v })} isRequired />
 
               <div className="col-span-2 md:col-span-4 flex items-center gap-3 mt-1">
-                <Button type="submit" color="primary" size="sm" isLoading={submitting}>
+                <Button type="submit" color="primary" size="sm" isLoading={submitting} className="bg-accent-gradient font-medium">
                   {submitting ? 'Saving…' : 'Add snapshot'}
                 </Button>
               </div>
             </form>
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       )}
 
-      <Card className="bg-runway-surface border border-runway-border">
-        <CardHeader className="flex items-center justify-between">
-          <span className="text-sm font-medium text-runway-text">History</span>
+      <div className="runway-card overflow-hidden">
+        <div className="runway-sheen" />
+        <div className="relative flex items-center justify-between px-5 pt-5 pb-2">
+          <span className="text-sm font-semibold text-runway-text">History</span>
           {snapshots && snapshots.length > 0 && (
             <Button
               size="sm"
               variant="flat"
               startContent={<Download size={14} />}
               onPress={() => downloadCsv(snapshots)}
+              className="font-medium"
             >
               Export CSV
             </Button>
           )}
-        </CardHeader>
-        <CardBody>
+        </div>
+        <div className="relative px-4 pb-4">
           {snapshots === null && <TableSkeleton rows={6} />}
           {snapshots !== null && (
           <Table
             aria-label="Metric snapshot history"
             removeWrapper
             classNames={{
-              th: 'bg-runway-charcoal text-runway-muted',
-              td: 'text-runway-text',
+              th: 'bg-transparent text-runway-muted text-[11px] uppercase tracking-wider',
+              td: 'text-runway-text py-3',
+              tr: 'border-b border-runway-border/50 last:border-0',
             }}
           >
             <TableHeader>
@@ -172,8 +177,8 @@ export function Metrics() {
             </TableBody>
           </Table>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

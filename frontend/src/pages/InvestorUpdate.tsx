@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Button, Card, CardBody, Input, Textarea } from '@heroui/react';
+import { Button, Input, Textarea } from '@heroui/react';
 import { FileDown, Lock } from 'lucide-react';
 import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
@@ -18,7 +18,8 @@ const defaultSections: NarrativeSection[] = [
 ];
 
 const inputClassNames = {
-  inputWrapper: 'bg-runway-charcoal border border-runway-border data-[hover=true]:bg-runway-charcoal',
+  inputWrapper:
+    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
   label: 'text-runway-muted',
 };
 
@@ -79,7 +80,7 @@ export function InvestorUpdate() {
   return (
     <motion.div className="flex flex-col gap-6 max-w-2xl" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
       <div>
-        <h2 className="text-lg font-medium text-runway-text">Investor Update Builder</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-runway-text">Investor Update Builder</h2>
         <p className="text-sm text-runway-muted">
           The dashboard is the input; this PDF is the product investors actually read.
         </p>
@@ -96,13 +97,14 @@ export function InvestorUpdate() {
       />
 
       {sections.map((s, i) => (
-        <Card key={i} className="bg-runway-surface border border-runway-border">
-          <CardBody className="flex flex-col gap-2">
+        <div key={i} className="runway-card p-5">
+          <div className="runway-sheen" />
+          <div className="relative flex flex-col gap-2">
             <Input
               value={s.heading}
               variant="underlined"
               size="sm"
-              classNames={{ input: 'text-sm font-medium text-runway-text', inputWrapper: 'border-runway-border' }}
+              classNames={{ input: 'text-sm font-semibold text-runway-text', inputWrapper: 'border-runway-border' }}
               onValueChange={(v) => {
                 const next = [...sections];
                 next[i] = { ...next[i], heading: v };
@@ -120,12 +122,12 @@ export function InvestorUpdate() {
                 setSections(next);
               }}
             />
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       ))}
 
       <div>
-        <Button color="primary" size="sm" isLoading={generating} onPress={exportPdf} startContent={!generating && <FileDown size={14} />}>
+        <Button color="primary" size="sm" isLoading={generating} onPress={exportPdf} startContent={!generating && <FileDown size={14} />} className="bg-accent-gradient font-medium">
           {generating ? 'Generating…' : 'Export PDF'}
         </Button>
       </div>

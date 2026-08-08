@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Button, Card, CardBody, CardHeader, Chip, Input } from '@heroui/react';
+import { Button, Chip, Input } from '@heroui/react';
 import { UserPlus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
@@ -52,13 +52,14 @@ export function Invites() {
   return (
     <div className="flex flex-col gap-6 max-w-xl">
       <div>
-        <h2 className="text-lg font-medium text-runway-text">Investor Invites</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-runway-text">Investor Invites</h2>
         <p className="text-sm text-runway-muted">Give investors read-only access to the dashboard and updates.</p>
       </div>
 
       {canInvite && (
-        <Card className="bg-runway-surface border border-runway-border">
-          <CardBody>
+        <div className="runway-card p-5">
+          <div className="runway-sheen" />
+          <div className="relative">
             <form onSubmit={handleSubmit} className="flex items-end gap-3">
               <Input
                 label="Investor email"
@@ -69,19 +70,24 @@ export function Invites() {
                 onValueChange={setEmail}
                 isRequired
                 className="flex-1"
-                classNames={{ inputWrapper: 'bg-runway-charcoal border border-runway-border', label: 'text-runway-muted' }}
+                classNames={{
+                  inputWrapper:
+                    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
+                  label: 'text-runway-muted',
+                }}
               />
-              <Button type="submit" color="primary" size="sm" isLoading={submitting}>
+              <Button type="submit" color="primary" size="sm" isLoading={submitting} className="bg-accent-gradient font-medium">
                 Send invite
               </Button>
             </form>
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       )}
 
-      <Card className="bg-runway-surface border border-runway-border">
-        <CardHeader className="text-sm font-medium text-runway-text">Pending &amp; sent invites</CardHeader>
-        <CardBody>
+      <div className="runway-card overflow-hidden">
+        <div className="runway-sheen" />
+        <div className="relative px-5 pt-5 pb-5">
+          <h3 className="text-sm font-semibold text-runway-text mb-3">Pending &amp; sent invites</h3>
           {invites === null && <TableSkeleton rows={3} />}
           {invites !== null && invites.length === 0 && (
             <EmptyState
@@ -91,11 +97,11 @@ export function Invites() {
             />
           )}
           {invites && invites.length > 0 && (
-            <div className="flex flex-col divide-y divide-runway-border/60">
+            <div className="flex flex-col divide-y divide-runway-border/50">
               {invites.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between py-2.5">
+                <div key={inv.id} className="flex items-center justify-between py-3">
                   <div>
-                    <p className="text-sm text-runway-text">{inv.email}</p>
+                    <p className="text-sm text-runway-text font-medium">{inv.email}</p>
                     <p className="text-[11px] text-runway-muted">{new Date(inv.createdAt).toLocaleDateString()}</p>
                   </div>
                   <Chip size="sm" variant="flat" color={statusColor[inv.status] ?? 'default'}>
@@ -105,8 +111,8 @@ export function Invites() {
               ))}
             </div>
           )}
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

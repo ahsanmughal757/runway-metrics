@@ -42,7 +42,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, x: 40 }}
                 transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="flex items-start gap-2.5 bg-runway-raised border border-runway-borderStrong rounded-lg px-3.5 py-3 shadow-raised"
+                className="flex items-start gap-2.5 rounded-xl border border-runway-borderStrong/80 bg-runway-raised/90 backdrop-blur-xl px-3.5 py-3 shadow-raised"
+                style={{ boxShadow: '0 16px 44px -12px rgba(0,0,0,0.7)' }}
               >
                 <Icon size={17} className={`shrink-0 mt-0.5 ${color}`} />
                 <p className="text-sm text-runway-text flex-1">{t.message}</p>

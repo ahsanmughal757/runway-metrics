@@ -70,10 +70,11 @@ export function CommandPalette() {
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg bg-runway-raised border border-runway-borderStrong rounded-xl shadow-raised overflow-hidden"
+            className="w-full max-w-lg overflow-hidden rounded-2xl border border-runway-borderStrong/80 bg-runway-raised/95 backdrop-blur-xl shadow-raised"
+            style={{ boxShadow: '0 24px 64px -16px rgba(0,0,0,0.8)' }}
           >
-            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-runway-border">
-              <Search size={16} className="text-runway-muted" />
+            <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-runway-border/70">
+              <Search size={16} className="text-runway-accent" />
               <input
                 autoFocus
                 value={query}
@@ -81,7 +82,7 @@ export function CommandPalette() {
                 placeholder="Jump to a screen or action…"
                 className="bg-transparent outline-none text-sm text-runway-text flex-1 placeholder:text-runway-muted"
               />
-              <kbd className="text-[10px] text-runway-muted border border-runway-border rounded px-1.5 py-0.5">ESC</kbd>
+              <kbd className="text-[10px] text-runway-muted border border-runway-border rounded-md px-1.5 py-0.5 bg-runway-charcoal">ESC</kbd>
             </div>
             <div className="max-h-80 overflow-y-auto py-1.5">
               {filtered.length === 0 && (
@@ -91,9 +92,11 @@ export function CommandPalette() {
                 <button
                   key={c.id}
                   onClick={() => run(c)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-runway-text hover:bg-runway-charcoal transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-runway-text hover:bg-white/[0.04] transition-colors text-left group"
                 >
-                  <c.icon size={16} className="text-runway-muted" />
+                  <span className="w-7 h-7 rounded-lg bg-white/[0.03] border border-runway-border/60 flex items-center justify-center group-hover:border-runway-accent/40 group-hover:bg-runway-accent/10">
+                    <c.icon size={15} className="text-runway-muted group-hover:text-runway-accent" />
+                  </span>
                   {c.label}
                 </button>
               ))}
