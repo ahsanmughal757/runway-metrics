@@ -38,6 +38,6 @@ export class CompaniesController {
   @UseGuards(RolesGuard)
   @Roles('FOUNDER')
   updateSettings(@CurrentUser() user: RequestUser, @Body() dto: UpdateSettingsDto) {
-    return this.repo.updateSettings(user.companyId, dto);
+    return this.repo.updateSettings(user.companyId, dto, user.userId);
   }
 }

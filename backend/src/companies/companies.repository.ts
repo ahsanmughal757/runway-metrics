@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { env } from '../config/env';
+import { AuditService } from '../audit/audit.service';
 
 export interface CompanySummary {
   id: string;
@@ -42,7 +43,10 @@ const demoSettings = new Map<string, CompanySettings>(
 
 @Injectable()
 export class CompaniesRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private audit: AuditService,
+  ) {}
 
   async findForUser(userId: string): Promise<CompanySummary[]> {
     if (env.ENABLE_DATABASE) {
@@ -81,13 +85,27 @@ export class CompaniesRepository {
     return demoSettings.get(companyId) ?? { id: companyId, name: 'Demo Company', runwayGreenMonths: 12, runwayYellowMonths: 6 };
   }
 
-  async updateSettings(companyId: string, patch: Partial<Pick<CompanySettings, 'name' | 'runwayGreenMonths' | 'runwayYellowMonths'>>): Promise<CompanySettings> {
+  async updateSettings(
+    companyId: string,
+    patch: Partial<Pick<CompanySettings, 'name' | 'runwayGreenMonths' | 'runwayYellowMonths'>>,
+    actorId: string,
+  ): Promise<CompanySettings> {
+    const before = await this.getSettings(companyId);
+
     if (env.ENABLE_DATABASE) {
       const c = await this.prisma.company.update({ where: { id: companyId }, data: patch });
+      await this.audit.record({
+        companyId,
+        entityId: companyId,
+        entityType: 'CompanySettings',
+        action: 'updated',
+        actorId,
+        diff: { before, after: patch },
+      });
       return { id: c.id, name: c.name, runwayGreenMonths: c.runwayGreenMonths, runwayYellowMonths: c.runwayYellowMonths };
     }
-    const current = await this.getSettings(companyId);
-    const next = { ...current, ...patch };
+
+    const next = { ...before, ...patch };
     demoSettings.set(companyId, next);
     return next;
   }

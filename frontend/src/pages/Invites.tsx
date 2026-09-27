@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Chip, Input } from '@heroui/react';
 import { UserPlus } from 'lucide-react';
 import { api } from '../lib/api';

@@ -4,7 +4,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { GitCompare } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-import { DashboardResponse } from '../lib/types';
+import type { DashboardResponse } from '../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from '../components/charts/chartTheme';
 import { ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';

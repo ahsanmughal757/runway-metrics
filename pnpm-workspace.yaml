@@ -4,11 +4,22 @@ packages:
 
 # pnpm only reads build-approval settings from the workspace root, so these
 # merged lists (from the former per-package pnpm-workspace.yaml files) live here.
+#
+# `true`  = run the package's install script
+# `false` = explicitly declined; pnpm treats an *undecided* entry as a hard
+#           error, so a decision must be recorded either way.
 allowBuilds:
   '@heroui/shared-utils': true
   '@nestjs/core': true
   '@prisma/client': true
   '@prisma/engines': true
+  # Native file watcher used by jest's module resolution. No network or
+  # install-time side effects, so prebuilding it is safe.
+  '@parcel/watcher': true
+  # Install-time telemetry. A production install should not phone home.
+  '@scarf/scarf': false
   bcrypt: true
   esbuild: true
   prisma: true
+  # Native resolver used by eslint-plugin-import-x / unrs.
+  unrs-resolver: true

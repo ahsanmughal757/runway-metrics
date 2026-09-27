@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { Injectable } from '@nestjs/common';
+import { AuditService } from '../audit/audit.service';
 
 interface ShareRecord {
   companyId: string;
@@ -17,10 +18,19 @@ const TOKEN_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
 export class ShareService {
   private store = new Map<string, ShareRecord>();
 
-  create(companyId: string): { token: string; url: string } {
+  constructor(private audit: AuditService) {}
+
+  async create(companyId: string, actorId: string): Promise<{ token: string; url: string }> {
     const token = randomBytes(16).toString('hex');
     this.store.set(token, { companyId, createdAt: Date.now() });
     this.purgeExpired();
+    await this.audit.record({
+      companyId,
+      entityId: `share:${token.slice(0, 8)}`,
+      entityType: 'ShareLink',
+      action: 'shared',
+      actorId,
+    });
     return { token, url: `/share/${token}` };
   }
 

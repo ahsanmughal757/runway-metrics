@@ -14,7 +14,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: RequestUser): Promise<RequestUser> {
+  // Synchronous on purpose: Passport accepts a plain return value here, and
+  // marking it `async` without an await would only add a microtask per request.
+  validate(payload: RequestUser): RequestUser {
     return payload;
   }
 }

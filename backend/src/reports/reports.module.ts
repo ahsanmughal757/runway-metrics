@@ -5,9 +5,10 @@ import { ShareService } from './share.service';
 import { AuthModule } from '../auth/auth.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { CompaniesModule } from '../companies/companies.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [AuthModule, MetricsModule, CompaniesModule],
+  imports: [AuthModule, MetricsModule, CompaniesModule, AuditModule],
   controllers: [ReportsController, ShareController],
   providers: [ShareService],
 })

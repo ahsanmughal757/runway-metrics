@@ -1,5 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine, CartesianGrid } from 'recharts';
-import { Snapshot } from '../../lib/types';
+import type { Snapshot } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from './chartTheme';
 
 export function MomGrowthChart({ snapshots }: { snapshots: Snapshot[] }) {

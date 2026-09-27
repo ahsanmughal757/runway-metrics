@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as Papa from 'papaparse';
 import { MetricsRepository, SnapshotInput } from './metrics.repository';
 import { CompaniesRepository } from '../companies/companies.repository';
+import { AuditService } from '../audit/audit.service';
 
 export interface DerivedMetrics {
   runwayMonths: number | null;
@@ -26,7 +27,11 @@ const REQUIRED_CSV_COLUMNS = [
 
 @Injectable()
 export class MetricsService {
-  constructor(private repo: MetricsRepository, private companies: CompaniesRepository) {}
+  constructor(
+    private repo: MetricsRepository,
+    private companies: CompaniesRepository,
+    private audit: AuditService,
+  ) {}
 
   async getDashboard(companyId: string) {
     const [snapshots, settings] = await Promise.all([
@@ -41,14 +46,39 @@ export class MetricsService {
     return { snapshots: withDerived, latest };
   }
 
-  upsertSnapshot(input: SnapshotInput) {
-    return this.repo.upsert(input);
+  async upsertSnapshot(input: SnapshotInput & { actorId: string }) {
+    const { actorId, ...rest } = input;
+    const monthKey = input.month.toISOString().slice(0, 10);
+    // Audit *after* the write resolves. Auditing first (or in parallel) records
+    // changes that never happened whenever the mutation fails, which is the one
+    // thing an audit trail must never do. `record` swallows its own errors, so
+    // awaiting it cannot fail the request.
+    const saved = await this.repo.upsert(rest);
+    await this.audit.record({
+      companyId: rest.companyId,
+      entityId: `${rest.companyId}:${monthKey}`,
+      entityType: 'MetricSnapshot',
+      action: 'updated',
+      actorId,
+    });
+    return saved;
   }
 
-  deleteSnapshot(companyId: string, month: Date) {
-    return this.repo.delete(companyId, month);
+  async deleteSnapshot(companyId: string, month: Date, actorId: string) {
+    const monthKey = month.toISOString().slice(0, 10);
+    const deleted = await this.repo.delete(companyId, month);
+    // A delete that matched nothing is not a change, so it gets no entry.
+    if (deleted) {
+      await this.audit.record({
+        companyId,
+        entityId: `${companyId}:${monthKey}`,
+        entityType: 'MetricSnapshot',
+        action: 'deleted',
+        actorId,
+      });
+    }
+    return deleted;
   }
-
   /** Computes runway, NRR, MoM growth, and churn splits for one point in the series using trailing context. */
   private deriveForIndex(all: SnapshotInput[], idx: number, greenMonths: number, yellowMonths: number): DerivedMetrics {
     const current = all[idx];
@@ -59,9 +89,20 @@ export class MetricsService {
     const avgBurn = window.reduce((sum, s) => sum + s.burnRate, 0) / window.length;
     const threeMoAvgBurn = Math.round(avgBurn * 100) / 100;
 
-    const runwayMonths = avgBurn > 0 ? Math.round((current.cash / avgBurn) * 10) / 10 : null;
-    const runwayZone =
-      runwayMonths === null ? 'unknown' : runwayMonths >= greenMonths ? 'green' : runwayMonths >= yellowMonths ? 'yellow' : 'red';
+    // An exhausted company has zero cash and therefore zero burn. Reading that
+    // as `null` would surface as "runway unknown", which is the most benign
+    // possible reading of the worst possible state. Insolvency is zero months.
+    const insolvent = current.cash <= 0;
+    const runwayMonths = insolvent ? 0 : avgBurn > 0 ? Math.round((current.cash / avgBurn) * 10) / 10 : null;
+    const runwayZone = insolvent
+      ? 'red'
+      : runwayMonths === null
+        ? 'unknown'
+        : runwayMonths >= greenMonths
+          ? 'green'
+          : runwayMonths >= yellowMonths
+            ? 'yellow'
+            : 'red';
 
     const startingMrr = prior ? prior.mrr : current.mrr - current.newMrr - current.expansionMrr + current.contractionMrr + current.churnedMrr;
     const nrr =
@@ -118,7 +159,7 @@ export class MetricsService {
       try {
         rows.push({
           companyId,
-          month: new Date(raw.month),
+          month: parseMonth(raw.month),
           mrr: num(raw.mrr),
           newMrr: num(raw.newMrr),
           expansionMrr: num(raw.expansionMrr),
@@ -139,12 +180,45 @@ export class MetricsService {
     return { rows, errors, rowCount: rows.length };
   }
 
-  async commitCsv(companyId: string, rows: SnapshotInput[]) {
-    return this.repo.importCsvRows(companyId, rows);
+  /**
+   * Parse-then-commit for a CSV upload, refusing to write anything if the file
+   * has a single validation error. A partially-applied import is worse than no
+   * import: the founder cannot tell which months landed.
+   */
+  async importAndCommit(companyId: string, csv: string, actorId: string) {
+    const { rows, errors } = this.parseCsvPreview(companyId, csv);
+    if (errors.length > 0) return { committed: 0, errors };
+    const committed = await this.commitCsv(companyId, rows, actorId);
+    return { committed, errors: [] as string[] };
+  }
+
+  async commitCsv(companyId: string, rows: SnapshotInput[], actorId: string) {
+    const committed = await this.repo.importCsvRows(companyId, rows);
+    await this.audit.record({
+      companyId,
+      entityId: `import:${new Date().toISOString()}`,
+      entityType: 'MetricSnapshot',
+      action: 'imported',
+      actorId,
+      diff: { rowCount: committed, firstMonth: rows[0]?.month.toISOString().slice(0, 7) ?? null, lastMonth: rows.at(-1)?.month.toISOString().slice(0, 7) ?? null },
+    });
+    return committed;
   }
 }
 
 function num(v: string | undefined): number {
   if (v === undefined || v === '' || Number.isNaN(Number(v))) throw new Error(`invalid numeric value "${v}"`);
   return Number(v);
+}
+
+/**
+ * `new Date('nonsense')` does not throw -- it returns an Invalid Date, which
+ * then surfaces as an opaque Prisma error at write time (or, in demo mode,
+ * silently "succeeds"). Validating here means a typo in a column that the
+ * founder cannot see is reported against a specific row instead.
+ */
+function parseMonth(v: string | undefined): Date {
+  const d = new Date(v ?? '');
+  if (Number.isNaN(d.getTime())) throw new Error(`invalid month date "${v ?? ''}"`);
+  return d;
 }

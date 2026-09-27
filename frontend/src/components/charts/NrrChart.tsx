@@ -1,5 +1,5 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot, CartesianGrid } from 'recharts';
-import { Snapshot } from '../../lib/types';
+import type { Snapshot } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from './chartTheme';
 
 // The metric investors scan for first: >100% = expansion outpacing churn.

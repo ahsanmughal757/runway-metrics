@@ -45,17 +45,22 @@ function timeAgo(iso: string) {
 const PAGE_SIZE = 12;
 
 export function Activity() {
-  const { activeCompanyId, role } = useCompany();
+  const { activeCompanyId } = useCompany();
   const [data, setData] = useState<ActivityPage | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
 
   const load = useCallback(
     (entityType: string | undefined, p: number) => {
       if (!activeCompanyId) return;
+      setError(null);
       const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) });
       if (entityType) params.set('entityType', entityType);
-      api.get<ActivityPage>(`/audit?${params.toString()}`).then(setData);
+      api
+        .get<ActivityPage>(`/audit?${params.toString()}`)
+        .then(setData)
+        .catch((e: Error) => setError(e.message));
     },
     [activeCompanyId],
   );
@@ -108,7 +113,8 @@ export function Activity() {
         <div className="runway-card overflow-hidden">
           <div className="runway-sheen" />
           <div className="relative px-4 py-2">
-            {!data && <div className="py-10 text-center text-sm text-runway-muted">Loading…</div>}
+            {!data && !error && <div className="py-10 text-center text-sm text-runway-muted">Loading…</div>}
+            {error && <div className="py-10 text-center text-sm text-runway-negative">Could not load activity: {error}</div>}
             {data && data.items.length === 0 && (
               <div className="py-10 text-center text-sm text-runway-muted">No activity in this filter yet.</div>
             )}

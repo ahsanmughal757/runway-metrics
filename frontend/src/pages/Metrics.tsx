@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from 'react';
+import type { FormEvent} from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button, Input,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
@@ -10,7 +11,7 @@ import { Download, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
-import { DashboardResponse, Snapshot } from '../lib/types';
+import type { DashboardResponse, Snapshot } from '../lib/types';
 import { TableSkeleton } from '../components/Skeleton';
 import { chartColors } from '../components/charts/chartTheme';
 

@@ -8,7 +8,7 @@
  */
 import * as fs from 'fs';
 import { generateSnapshots } from '../src/fake-data/generator';
-import { PersonaKey } from '../src/fake-data/personas';
+import { type PersonaKey } from '../src/fake-data/personas';
 
 function arg(name: string, fallback: string): string {
   const found = process.argv.find((a) => a.startsWith(`--${name}=`));

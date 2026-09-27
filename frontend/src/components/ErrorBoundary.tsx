@@ -1,4 +1,5 @@
-import { Component, ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { Component } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 interface Props { children: ReactNode; }
@@ -12,7 +13,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: unknown) {
-    // eslint-disable-next-line no-console
+     
     console.error('Runway UI error boundary caught:', error, info);
   }
 

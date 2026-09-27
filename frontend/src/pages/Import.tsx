@@ -1,4 +1,5 @@
-import { ChangeEvent, useRef, useState } from 'react';
+import type { ChangeEvent} from 'react';
+import { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@heroui/react';
 import { UploadCloud, FileCheck2 } from 'lucide-react';

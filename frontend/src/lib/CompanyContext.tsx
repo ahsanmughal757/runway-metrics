@@ -1,6 +1,7 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import type { ReactNode} from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { api } from './api';
-import { CompanySummary } from './types';
+import type { CompanySummary } from './types';
 
 interface CompanyContextValue {
   companies: CompanySummary[];

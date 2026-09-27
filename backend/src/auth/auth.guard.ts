@@ -13,7 +13,7 @@ import { BypassAuthGuard } from './bypass-auth.guard';
 export class AuthGuard extends PassportAuthGuard('jwt') {
   private bypass = new BypassAuthGuard();
 
-  canActivate(context: ExecutionContext) {
+  override canActivate(context: ExecutionContext) {
     if (env.BYPASS_AUTH) {
       return this.bypass.canActivate(context);
     }

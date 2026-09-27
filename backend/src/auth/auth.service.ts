@@ -40,7 +40,7 @@ export class AuthService {
       companyId: membership.companyId,
       role: membership.role,
     };
-    const token = this.jwt.sign(payload, { expiresIn: env.JWT_EXPIRES_IN });
+    const token = this.jwt.sign(payload, { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS });
     return { accessToken: token, user: payload };
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tab, Tabs } from '@heroui/react';
-import { CohortRow } from '../lib/types';
+import type { CohortRow } from '../lib/types';
 
 function cellColor(pct: number) {
   if (pct >= 90) return 'bg-runway-positive/20 text-runway-positive';

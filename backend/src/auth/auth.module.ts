@@ -10,7 +10,13 @@ import { env } from '../config/env';
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({ secret: env.JWT_SECRET, signOptions: { expiresIn: env.JWT_EXPIRES_IN } }),
+    // Short-lived by design. Phase 3 moves the session into httpOnly cookies
+    // with a rotating refresh token; until then this TTL is the only thing
+    // bounding the blast radius of a leaked token, so it is minutes not days.
+    JwtModule.register({
+      secret: env.JWT_SECRET,
+      signOptions: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS },
+    }),
   ],
   providers: [AuthService, JwtStrategy, AuthGuard],
   controllers: [AuthController],

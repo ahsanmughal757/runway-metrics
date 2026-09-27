@@ -4,9 +4,10 @@ import { MetricsService } from './metrics.service';
 import { MetricsRepository } from './metrics.repository';
 import { AuthModule } from '../auth/auth.module';
 import { CompaniesModule } from '../companies/companies.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [AuthModule, CompaniesModule],
+  imports: [AuthModule, CompaniesModule, AuditModule],
   controllers: [MetricsController],
   providers: [MetricsService, MetricsRepository],
   exports: [MetricsService],

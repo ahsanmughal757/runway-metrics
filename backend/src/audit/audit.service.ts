@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { env } from '../config/env';
 
@@ -8,6 +8,34 @@ export interface ActivityItem {
   action: string;
   changedBy: string;
   changedAt: string;
+}
+
+/**
+ * Closed sets rather than free strings: an audit trail nobody can query is
+ * worthless, and typos in `action` silently create unscannable buckets.
+ */
+export type AuditEntityType =
+  | 'MetricSnapshot'
+  | 'Customer'
+  | 'CohortEntry'
+  | 'Company'
+  | 'CompanySettings'
+  | 'CompanyMembership'
+  | 'InvestorInvite'
+  | 'ShareLink'
+  | 'Report'
+  | 'User';
+
+export type AuditAction = 'created' | 'updated' | 'deleted' | 'imported' | 'generated' | 'shared' | 'invited';
+
+export interface RecordAuditInput {
+  companyId: string;
+  entityId: string;
+  entityType: AuditEntityType;
+  action: AuditAction;
+  /** The acting user's id. Falls back to the bypass demo user in demo mode. */
+  actorId: string;
+  diff?: unknown;
 }
 
 // In-memory feed for demo/BYPASS_AUTH mode, seeded with a few plausible
@@ -28,13 +56,34 @@ const demoFeed: Record<string, ActivityItem[]> = {
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  async record(companyId: string, entityId: string, entityType: string, action: string, changedBy: string, diff?: unknown) {
+  /**
+   * Append-only trail of every state change in a company.
+   *
+   * Deliberately does not throw. A failed audit insert must not roll back or
+   * 500 a founder's saved month — the data change already happened, and
+   * losing it because bookkeeping failed is strictly worse. Failures are
+   * logged at error level with full context so they are alertable, and the
+   * reconciler can backfill. Phase 2 moves these writes into the same
+   * transaction as the mutation they describe, which closes the gap properly.
+   */
+  async record(input: RecordAuditInput): Promise<void> {
     if (!env.ENABLE_DATABASE) return; // no-op in demo mode
-    await this.prisma.auditLog.create({
-      data: { companyId, entityId, entityType, action, changedBy, diff: diff as any },
-    });
+
+    const { companyId, entityId, entityType, action, actorId, diff } = input;
+    try {
+      await this.prisma.auditLog.create({
+        data: { companyId, entityId, entityType, action, changedBy: actorId, diff: diff as never },
+      });
+    } catch (err) {
+      this.logger.error(
+        { err, companyId, entityId, entityType, action, actorId },
+        'Failed to write audit log entry',
+      );
+    }
   }
 
   async recent(companyId: string): Promise<ActivityItem[]> {

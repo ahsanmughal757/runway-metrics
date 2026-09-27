@@ -62,13 +62,13 @@ export class MetricsController {
   @Post('snapshot')
   @Roles('FOUNDER')
   upsertSnapshot(@CurrentUser() user: RequestUser, @Body() dto: UpsertSnapshotDto) {
-    return this.metrics.upsertSnapshot({ ...dto, companyId: user.companyId, month: new Date(dto.month) });
+    return this.metrics.upsertSnapshot({ ...dto, companyId: user.companyId, month: new Date(dto.month), actorId: user.userId });
   }
 
   @Delete('snapshot/:month')
   @Roles('FOUNDER')
   deleteSnapshot(@CurrentUser() user: RequestUser, @Param('month') month: string) {
-    return this.metrics.deleteSnapshot(user.companyId, new Date(month));
+    return this.metrics.deleteSnapshot(user.companyId, new Date(month), user.userId);
   }
 
   @Post('import/preview')
@@ -79,11 +79,8 @@ export class MetricsController {
 
   @Post('import/commit')
   @Roles('FOUNDER')
-  async commitCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
-    const { rows, errors } = this.metrics.parseCsvPreview(user.companyId, dto.csv);
-    if (errors.length > 0) return { committed: 0, errors };
-    const committed = await this.metrics.commitCsv(user.companyId, rows);
-    return { committed, errors: [] };
+  commitCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
+    return this.metrics.importAndCommit(user.companyId, dto.csv, user.userId);
   }
 
   /**

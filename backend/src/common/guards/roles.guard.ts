@@ -19,9 +19,12 @@ export class RolesGuard implements CanActivate {
     ]);
     if (!required || required.length === 0) return true;
 
-    const req = context.switchToHttp().getRequest();
-    const user = req.user;
-    if (!user || !required.includes(user.role)) {
+    // getRequest() is untyped, so the request is narrowed to the one field
+    // this guard reads. Letting it stay `any` would mean an unchecked property
+    // access in the only place role enforcement happens.
+    const req = context.switchToHttp().getRequest<{ user?: { role?: MembershipRole } }>();
+    const role = req.user?.role;
+    if (!role || !required.includes(role)) {
       throw new ForbiddenException(
         `This action requires one of the following roles: ${required.join(', ')}`,
       );

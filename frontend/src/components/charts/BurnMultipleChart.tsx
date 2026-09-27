@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid } from 'recharts';
-import { Snapshot } from '../../lib/types';
+import type { Snapshot } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from './chartTheme';
 
 /**

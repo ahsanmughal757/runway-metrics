@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { CohortRow } from '../../lib/types';
+import type { CohortRow } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle } from './chartTheme';
 
 const PALETTE = [chartColors.accent, chartColors.accent2, chartColors.positive, chartColors.amber, '#38bdf8', '#e879f9'];

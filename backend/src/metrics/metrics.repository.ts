@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { env } from '../config/env';
 import { generateSnapshots } from '../fake-data/generator';
 import { PersonaKey } from '../fake-data/personas';
+
+/** The exact row shape Prisma returns, so the mapper needs no `any`. */
+type MetricSnapshotRow = Prisma.MetricSnapshotGetPayload<Record<string, never>>;
 
 export interface SnapshotInput {
   companyId: string;
@@ -101,7 +105,7 @@ export class MetricsRepository {
   }
 }
 
-function toSnapshotInput(row: any): SnapshotInput {
+function toSnapshotInput(row: MetricSnapshotRow): SnapshotInput {
   return {
     companyId: row.companyId,
     month: row.month,

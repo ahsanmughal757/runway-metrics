@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-import { DashboardResponse } from '../lib/types';
+import type { DashboardResponse } from '../lib/types';
 
 /**
  * "Data as of {latest month}" pill pulled from the dashboard response.

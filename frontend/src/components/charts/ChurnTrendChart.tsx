@@ -1,5 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceDot, CartesianGrid } from 'recharts';
-import { Snapshot } from '../../lib/types';
+import type { Snapshot } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from './chartTheme';
 
 /** Flags months where revenue churn spikes >1.5x the trailing 3-month average — usually a pricing-change or incident month worth annotating rather than leaving unexplained. */

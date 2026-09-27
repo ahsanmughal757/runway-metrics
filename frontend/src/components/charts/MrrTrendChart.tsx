@@ -1,28 +1,33 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, ReferenceDot } from 'recharts';
-import { Snapshot } from '../../lib/types';
+import type { Snapshot } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from './chartTheme';
+
+type TooltipArgs = {
+  active?: boolean;
+  payload?: { dataKey?: string | number; name?: string; color?: string; value?: number }[];
+  label?: string;
+};
 
 export function MrrTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
   const data = snapshots.map((s) => ({ month: s.month, mrr: s.mrr, note: s.notes ?? null }));
   const last = data[data.length - 1]?.mrr ?? 0;
   const noted = data.filter((d) => d.note);
 
-  function NoteAwareTooltip(props: {
-    active?: boolean;
-    payload?: { dataKey?: string | number; name?: string; color?: string; value?: number }[];
-    label?: string;
-  }) {
-    const point = data.find((d) => d.month === props.label);
+  // A render function, not a nested component. This tooltip needs the current
+  // `data` to look up a month's note, but declaring a component inside render
+  // gives it a new identity every pass, which discards its state each time.
+  const renderTooltip = ({ active, payload, label }: TooltipArgs) => {
+    const point = data.find((d) => d.month === label);
     return (
       <ChartTooltip
-        active={props.active}
-        payload={props.payload}
-        label={props.label}
+        active={active}
+        payload={payload}
+        label={label}
         formatter={(v) => `$${v.toLocaleString()}`}
-        note={props.active ? point?.note ?? undefined : undefined}
+        note={active ? point?.note ?? undefined : undefined}
       />
     );
-  }
+  };
 
   return (
     <ResponsiveContainer width="100%" height={260}>
@@ -44,7 +49,7 @@ export function MrrTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
           width={52}
           domain={['dataMin * 0.92', 'dataMax * 1.04']}
         />
-        <Tooltip content={<NoteAwareTooltip />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
+        <Tooltip content={renderTooltip} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
         {/* Glow pass under the main line */}
         <Area type="monotone" dataKey="mrr" stroke={chartColors.accent} strokeWidth={7} strokeOpacity={0.18} fill="none" dot={false} activeDot={false} isAnimationActive={false} />
         <Area

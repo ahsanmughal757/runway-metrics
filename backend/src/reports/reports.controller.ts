@@ -8,6 +8,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { MetricsService } from '../metrics/metrics.service';
 import { CompaniesRepository } from '../companies/companies.repository';
+import { AuditService } from '../audit/audit.service';
 import { renderInvestorUpdatePdf } from './investor-update.pdf';
 
 class NarrativeSectionDto {
@@ -23,7 +24,11 @@ class GenerateReportDto {
 @Controller('reports')
 @UseGuards(AuthGuard, RolesGuard, CompanyScopeGuard)
 export class ReportsController {
-  constructor(private metrics: MetricsService, private companies: CompaniesRepository) {}
+  constructor(
+    private metrics: MetricsService,
+    private companies: CompaniesRepository,
+    private audit: AuditService,
+  ) {}
 
   // Founder builds/exports the update; investors receive the PDF, they don't generate it.
   @Post('investor-update')
@@ -54,6 +59,14 @@ export class ReportsController {
       generatedAt: new Date().toLocaleDateString('en-US', { dateStyle: 'medium' }),
     });
     res.setHeader('Content-Disposition', 'attachment; filename="investor-update.pdf"');
+    await this.audit.record({
+      companyId: user.companyId,
+      entityId: `report:${dto.periodLabel}`,
+      entityType: 'Report',
+      action: 'generated',
+      actorId: user.userId,
+      diff: { periodLabel: dto.periodLabel, sectionCount: dto.narrativeSections.length },
+    });
     res.send(pdf);
   }
 }

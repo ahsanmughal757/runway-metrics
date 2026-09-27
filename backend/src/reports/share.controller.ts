@@ -16,7 +16,7 @@ export class ShareController {
   @UseGuards(AuthGuard, RolesGuard, CompanyScopeGuard)
   @Roles('FOUNDER')
   createShareLink(@CurrentUser() user: RequestUser) {
-    return this.shares.create(user.companyId);
+    return this.shares.create(user.companyId, user.userId);
   }
 
   // Public, token-gated dashboard feed — no auth guard here by design.

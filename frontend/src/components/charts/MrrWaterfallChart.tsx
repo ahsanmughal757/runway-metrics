@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Select, SelectItem } from '@heroui/react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, CartesianGrid, Cell, LabelList } from 'recharts';
-import { Snapshot } from '../../lib/types';
+import type { Snapshot } from '../../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from './chartTheme';
 
 interface WaterfallEntry {

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Avatar, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Select, SelectItem, Switch, Tab, Tabs } from '@heroui/react';
+import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Select, SelectItem, Switch, Tab, Tabs } from '@heroui/react';
 import { Command, Moon, Sun, UserRound, Building2, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../lib/CompanyContext';
 import { useAuth } from '../lib/AuthContext';
-import { applyTheme, AppTheme, getStoredTheme, setStoredTheme } from '../lib/theme';
+import type { AppTheme} from '../lib/theme';
+import { applyTheme, getStoredTheme, setStoredTheme } from '../lib/theme';
 import { NotificationsBell } from './NotificationsBell';
 import { DataAsOf } from './DataAsOf';
 

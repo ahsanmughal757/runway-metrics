@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-import { DashboardResponse } from '../lib/types';
+import type { DashboardResponse } from '../lib/types';
 import { RunwayScenarioSlider } from '../components/RunwayScenarioSlider';
 import { ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';

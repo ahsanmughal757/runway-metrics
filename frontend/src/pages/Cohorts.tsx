@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Users } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-import { CohortRow } from '../lib/types';
+import type { CohortRow } from '../lib/types';
 import { CohortTable } from '../components/CohortTable';
 import { CohortLtvChart } from '../components/charts/CohortLtvChart';
 import { EmptyState } from '../components/EmptyState';

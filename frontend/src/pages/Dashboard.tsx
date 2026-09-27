@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Select, SelectItem } from '@heroui/react';
 import { DollarSign, TrendingDown, Flame, Gauge, Upload, PlusCircle } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-import { DashboardResponse } from '../lib/types';
+import type { DashboardResponse } from '../lib/types';
 import { KpiCard } from '../components/KpiCard';
 import { CountUp } from '../components/CountUp';
 import { KpiCardSkeleton, ChartCardSkeleton } from '../components/Skeleton';
@@ -36,6 +36,13 @@ export function Dashboard() {
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [range, setRange] = useState<'6' | '12' | '24' | 'all'>('12');
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Passed to ChartCard instead of the ref object itself: registering a node is
+  // a side effect, and a child writing into a prop during render re-renders the
+  // parent on every ref callback.
+  const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    refs.current[id] = el;
+  }, []);
 
   useEffect(() => {
     if (!activeCompanyId) return;
@@ -147,13 +154,13 @@ export function Dashboard() {
       </motion.div>
 
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
-        <ChartCard id={sectionIds.mrr} title="MRR Trend" refs={refs} highlighted={highlighted}>
+        <ChartCard id={sectionIds.mrr} title="MRR Trend" registerRef={registerRef} highlighted={highlighted}>
           <MrrTrendChart snapshots={chartSnapshots} />
         </ChartCard>
       </motion.div>
 
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
-        <ChartCard id="chart-waterfall" title="MRR Waterfall" refs={refs} highlighted={highlighted}>
+        <ChartCard id="chart-waterfall" title="MRR Waterfall" registerRef={registerRef} highlighted={highlighted}>
           <MrrWaterfallChart snapshots={chartSnapshots} />
         </ChartCard>
       </motion.div>
@@ -161,42 +168,42 @@ export function Dashboard() {
       {/* Bento layout: asymmetric widths instead of a uniform 2-up grid */}
       <motion.div className="grid md:grid-cols-12 gap-6" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <div className="md:col-span-7">
-          <ChartCard id={sectionIds.burn} title="Burn vs. Cash Balance" refs={refs} highlighted={highlighted}>
+          <ChartCard id={sectionIds.burn} title="Burn vs. Cash Balance" registerRef={registerRef} highlighted={highlighted}>
             <BurnCashChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-5">
-          <ChartCard id="chart-burn-multiple" title="Burn Multiple" refs={refs} highlighted={highlighted}>
+          <ChartCard id="chart-burn-multiple" title="Burn Multiple" registerRef={registerRef} highlighted={highlighted}>
             <BurnMultipleChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-7">
-          <ChartCard id="chart-rule-of-40" title="Rule of 40" refs={refs} highlighted={highlighted}>
+          <ChartCard id="chart-rule-of-40" title="Rule of 40" registerRef={registerRef} highlighted={highlighted}>
             <RuleOf40Chart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-5">
-          <ChartCard id="chart-quick-ratio" title="Quick Ratio" refs={refs} highlighted={highlighted}>
+          <ChartCard id="chart-quick-ratio" title="Quick Ratio" registerRef={registerRef} highlighted={highlighted}>
             <QuickRatioChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-5">
-          <ChartCard id={sectionIds.churn} title="Churn % Trend" refs={refs} highlighted={highlighted}>
+          <ChartCard id={sectionIds.churn} title="Churn % Trend" registerRef={registerRef} highlighted={highlighted}>
             <ChurnTrendChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-7">
-          <ChartCard id={sectionIds.nrr} title="Net Revenue Retention" refs={refs} highlighted={highlighted}>
+          <ChartCard id={sectionIds.nrr} title="Net Revenue Retention" registerRef={registerRef} highlighted={highlighted}>
             <NrrChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-7">
-          <ChartCard id={sectionIds.mom} title="MoM Growth Rate" refs={refs} highlighted={highlighted}>
+          <ChartCard id={sectionIds.mom} title="MoM Growth Rate" registerRef={registerRef} highlighted={highlighted}>
             <MomGrowthChart snapshots={chartSnapshots} />
           </ChartCard>
         </div>
         <div className="md:col-span-5">
-          <ChartCard id="chart-benchmarks" title="Benchmarks" refs={refs} highlighted={highlighted}>
+          <ChartCard id="chart-benchmarks" title="Benchmarks" registerRef={registerRef} highlighted={highlighted}>
             <BenchmarkChart />
           </ChartCard>
         </div>
@@ -206,11 +213,12 @@ export function Dashboard() {
 }
 
 function ChartCard({
-  id, title, children, refs, highlighted,
-}: { id: string; title: string; children: ReactNode; refs: MutableRefObject<Record<string, HTMLDivElement | null>>; highlighted: string | null }) {
+  id, title, children, registerRef, highlighted,
+}: { id: string; title: string; children: ReactNode; registerRef: (id: string, el: HTMLDivElement | null) => void; highlighted: string | null }) {
+  // Target for the PNG export button; unrelated to the scroll-to refs.
   const chartRef = useRef<HTMLDivElement>(null);
   return (
-    <div ref={(el) => (refs.current[id] = el)}>
+    <div ref={(el) => registerRef(id, el)}>
       <div
         className={`runway-card transition-all duration-300 ${
           highlighted === id ? 'border-runway-accent/50 shadow-glow' : ''

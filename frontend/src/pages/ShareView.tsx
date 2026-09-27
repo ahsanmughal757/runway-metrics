@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { DollarSign, Flame, Gauge, Lock } from 'lucide-react';
 import { api } from '../lib/api';
-import { DashboardResponse } from '../lib/types';
+import type { DashboardResponse } from '../lib/types';
 import { KpiCard } from '../components/KpiCard';
 import { CountUp } from '../components/CountUp';
 import { MrrTrendChart } from '../components/charts/MrrTrendChart';

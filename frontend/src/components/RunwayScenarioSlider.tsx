@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Slider, Chip } from '@heroui/react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
-import { Snapshot } from '../lib/types';
+import type { Snapshot } from '../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle } from './charts/chartTheme';
 
 interface ProjectionPoint {

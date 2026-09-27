@@ -2,10 +2,10 @@
   "name": "runway",
   "version": "1.0.0",
   "private": true,
-  "description": "Runway — investor-grade metrics for founders (pnpm monorepo: backend + frontend)",
+  "description": "Runway - investor-grade metrics for founders (pnpm monorepo: backend + frontend)",
   "packageManager": "pnpm@11.18.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
   "scripts": {
     "dev": "concurrently -n api,web -c blue,magenta \"pnpm run dev:api\" \"pnpm run dev:web\"",
@@ -16,7 +16,15 @@
     "build": "pnpm -r run build",
     "db:generate": "pnpm --filter runway-backend run prisma:generate",
     "db:migrate": "pnpm --filter runway-backend run prisma:migrate",
-    "db:seed": "pnpm --filter runway-backend run seed"
+    "db:seed": "pnpm --filter runway-backend run seed",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm --filter runway-backend run test",
+    "test:e2e": "pnpm --filter runway-backend run test:e2e",
+    "format": "pnpm -r run format",
+    "format:check": "pnpm -r run format:check",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:e2e && pnpm run build",
+    "secrets": "node scripts/generate-secrets.mjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
