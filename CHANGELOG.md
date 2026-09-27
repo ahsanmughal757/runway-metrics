@@ -60,10 +60,40 @@ boundary", and it was not.
   spends its token, so a client that fires four parallel refreshes after four
   parallel 401s would trip reuse detection and revoke its own family. The
   frontend therefore holds a single in-flight refresh promise
-  (`frontend/src/lib/api.ts`) and shares it across all waiters.
+  (`frontend/src/lib/api.ts`) and shares it across all waiters. The *server*
+  also resolves the race on its own — see below, because the client fix alone
+  was not sufficient.
 - The client no longer attempts a refresh for 401s from `/auth/login`,
   `/auth/register`, `/auth/refresh` or `/auth/logout`, or when there is no token
   to refresh. A wrong password must not mint a token.
+
+### Fixed: two simultaneous refreshes could both succeed, defeating reuse detection
+
+**Was:** `SessionsService.rotate` read the session, then updated it. Under
+PostgreSQL's default READ COMMITTED isolation those are two separate statements,
+so two refreshes of the same token could both read `revokedAt: null` and both
+proceed to mint a replacement.
+
+**Now:** the token is claimed with a compare-and-swap —
+`updateMany({ where: { id, revokedAt: null } })` — before any replacement row is
+created. Exactly one transaction changes the row; the other matches nothing,
+sees `count: 0`, and treats the attempt as reuse, revoking the family.
+
+**Why it mattered:** this was not a theoretical edge. The test that pins it
+found that two concurrent refreshes both returned 200 and left the family with
+**two live sessions** sharing one `familyId`. That is the outcome reuse
+detection exists to prevent, and it was passing silently — the one bug in this
+feature that a stolen token could have exploited directly, since a thief
+racing the real user is exactly this request pattern. It also defeated the
+feature for benign two-tab races, which would have looked like random logouts.
+
+**Affects:** `SessionsService.rotate` only. No API or schema change.
+
+**Watch for:** the loser revokes the family, which includes the replacement the
+winner was just handed, so both callers end up signed out. That is intended and
+is the same fail-closed trade as the sequential case; the client-side
+single-flight is what keeps it from happening to someone who simply had two tabs
+open.
 
 ### Changed: email addresses are trimmed at the request edge, not rejected
 

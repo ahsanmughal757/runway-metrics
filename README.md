@@ -261,7 +261,12 @@ database per request; invites, share links and audit rows became real tables;
 and a real-PostgreSQL suite (`pnpm test:db`) was added because none of the
 above is observable from a unit test with a fake data source.
 
+**v4 sessions:** the refresh token moved into an httpOnly cookie as an opaque
+random value stored only as a hash, rotated on every use, with reuse treated as
+theft. `POST /auth/logout` now exists and revokes server-side, and the Devices
+page lists and revokes live sessions. The database suites were also moved onto
+the URLs production actually serves, which had been hiding that the refresh
+cookie's `Path` never matched the URLs under test.
+
 Live sockets, i18n, and real Stripe billing remain out of scope, named rather
-than silently skipped. Server-side session revocation is also still open:
-`POST /auth/logout` does not exist yet, so logging out clears the browser
-while the token remains valid until it expires.
+than silently skipped.

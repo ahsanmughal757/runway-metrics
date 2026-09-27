@@ -412,6 +412,45 @@ describe('sessions and refresh rotation (real database)', () => {
     });
   });
 
+  describe('rotation under concurrency', () => {
+    it('lets exactly one of two simultaneous refreshes win', async () => {
+      const { refreshToken } = await signIn(app);
+
+      // Two refreshes of the same token, at the same instant. This is the shape
+      // a stolen cookie produces when the thief and the real user act at once -
+      // and also the shape two browser tabs produce by accident. The server
+      // cannot tell them apart, so one of them must lose.
+      const [first, second] = await Promise.all([
+        request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)),
+        request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)),
+      ]);
+
+      const statuses = [first.status, second.status].sort();
+      expect(statuses).toEqual([200, 401]);
+    });
+
+    it('revokes the family when a refresh loses the race, so the winner is dead too', async () => {
+      const { refreshToken } = await signIn(app);
+
+      const responses = await Promise.all([
+        request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)),
+        request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)),
+      ]);
+      const winner = responses.find((r) => r.status === 200);
+      if (!winner) throw new Error('expected one refresh to win');
+
+      // The loser's reuse signal revokes the family, which includes the token
+      // the winner was just handed. Leaving that alive would be the bug: the
+      // family would hold two live tokens and reuse detection would have
+      // detected nothing, which is the outcome the whole design exists to stop.
+      expect(await liveFamily(refreshToken)).toHaveLength(0);
+      await request(app.getHttpServer())
+        .post('/api/auth/refresh')
+        .set(withCookie(tokenFrom(winner)))
+        .expect(401);
+    });
+  });
+
   describe('listing and revoking sessions', () => {
     it('marks the device that is asking, so the user can tell it apart', async () => {
       const laptop = await signIn(app);

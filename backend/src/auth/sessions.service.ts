@@ -38,9 +38,11 @@ export interface ClientMeta {
  * waking at once - will kill the family and log the user out. That is a
  * deliberate fail-closed choice: the server cannot honestly distinguish the two
  * cases, and guessing "probably just concurrency" on a theft signal is the
- * wrong direction to be wrong in. The client avoids the false positive by
+ * wrong direction to be wrong in. The client reduces the false positive by
  * collapsing concurrent refreshes into one in-flight request (see
- * `frontend/src/lib/api.ts`).
+ * `frontend/src/lib/api.ts`), and `rotate` guarantees that the *server* also
+ * resolves the race, so a client that gets it wrong cannot end up with two live
+ * tokens.
  */
 @Injectable()
 export class SessionsService {
@@ -99,6 +101,32 @@ export class SessionsService {
         return { kind: 'inactive' } as const;
       }
 
+      // Claim the token before minting its replacement.
+      //
+      // A plain read-then-update is not enough: PostgreSQL's default isolation
+      // is READ COMMITTED, so two refreshes of the same token can both read
+      // `revokedAt: null` and both proceed. They would each create a
+      // replacement, leaving the family with two live tokens and no reuse
+      // signal at all - which is precisely the case reuse detection exists to
+      // catch, silently missed.
+      //
+      // `updateMany` with `revokedAt: null` in the WHERE clause is a
+      // compare-and-swap: whoever changes the row first wins, and the second
+      // transaction's UPDATE matches nothing and reports `count: 0`. It claims
+      // the token without SELECT ... FOR UPDATE, so no lock is held for longer
+      // than this one statement.
+      const now = new Date();
+      const claimed = await tx.session.updateMany({
+        where: { id: current.id, revokedAt: null },
+        data: { revokedAt: now, lastUsedAt: now },
+      });
+      if (claimed.count === 0) {
+        // Lost the race. Someone else is spending this token right now, so
+        // presenting it is a reuse signal however innocent the explanation is.
+        await this.revokeFamilyIn(tx, current.familyId);
+        return { kind: 'reused' } as const;
+      }
+
       const nextToken = randomBytes(32).toString('base64url');
       const next = await tx.session.create({
         data: {
@@ -114,10 +142,7 @@ export class SessionsService {
         },
       });
 
-      await tx.session.update({
-        where: { id: current.id },
-        data: { revokedAt: new Date(), replacedById: next.id, lastUsedAt: new Date() },
-      });
+      await tx.session.update({ where: { id: current.id }, data: { replacedById: next.id } });
 
       return { kind: 'ok' as const, token: nextToken, user };
     });
