@@ -24,24 +24,39 @@ and Login/Signup screens wired to the existing JWT backend.
 | CSV | `papaparse` (import), client-side generation (export) |
 | Fake data | `@faker-js/faker`, persona-driven generator shared by seed script, CSV export, and the in-memory demo API |
 
-## Two ways to run it
+## Running it
 
-### 1. Zero-setup demo mode (no database)
-
-```bash
-cd backend
-cp .env.example .env        # leave ENABLE_DATABASE=false, BYPASS_AUTH=true
-npm install
-npm run start:dev
-```
+This is a pnpm workspace monorepo — one install, one lockfile, one command.
 
 ```bash
-cd frontend
-npm install
-npm run dev
+pnpm install     # installs backend + frontend together
+pnpm dev         # starts the API (:4000) and the web app (:5173) together
 ```
 
-Open http://localhost:5173. Every API route is live — dashboard, cohorts,
+`pnpm dev` runs both processes under `concurrently` with `[api]` / `[web]`
+prefixed logs, and shuts both down together on Ctrl-C. Open
+http://localhost:5173 — Vite proxies `/api` to the backend, so there is no CORS
+or base-URL configuration to touch.
+
+| Script | What it does |
+|---|---|
+| `pnpm dev` | API + web app together (the main entry point) |
+| `pnpm dev:api` | API only (`backend`, `nest start --watch`) |
+| `pnpm dev:web` | Web app only (`frontend`, `vite`) |
+| `pnpm dev:db` | Starts Postgres via `docker compose` (only needed for full mode) |
+| `pnpm build` | `nest build` + `tsc -b && vite build` |
+| `pnpm db:migrate` / `pnpm db:seed` | Prisma migrate / seed |
+
+### Zero-setup demo mode (no database — the default)
+
+Leave `ENABLE_DATABASE=false` and `BYPASS_AUTH=true` in `backend/.env`:
+
+```bash
+cp backend/.env.example backend/.env
+pnpm dev
+```
+
+Every API route is live — dashboard, cohorts,
 metrics entry, CSV import/export, PDF export, settings, invites, comparison,
 notifications — served from the persona-based fake data generator instead of
 Postgres. The company switcher (top bar) flips between three seeded personas
@@ -52,17 +67,15 @@ Press **⌘K** anywhere to jump between screens.
 `BYPASS_AUTH=true` must never be set outside local development —
 `src/config/env.ts` throws at boot if it's combined with `NODE_ENV=production`.
 
-### 2. Full mode (real Postgres, real JWT auth)
+### Full mode (real Postgres, real JWT auth)
 
 ```bash
-docker compose up -d               # starts Postgres on :5432
-cd backend
-cp .env.example .env
+pnpm dev:db                     # starts Postgres on :5432
+cp backend/.env.example backend/.env
 # set ENABLE_DATABASE=true, BYPASS_AUTH=false
-npm install
-npm run prisma:migrate
-npm run seed                       # seeds all 3 personas + demo users
-npm run start:dev
+pnpm db:migrate
+pnpm db:seed                    # seeds all 3 personas + demo users
+pnpm dev
 ```
 
 Demo logins after seeding: `demo.founder@runway.local` /
@@ -73,7 +86,7 @@ this mode.
 Generate a standalone sample CSV (same generator, no server needed):
 
 ```bash
-npx ts-node scripts/generate-csv.ts --persona=hypergrowth --out=./sample.csv
+pnpm --filter runway-backend exec ts-node scripts/generate-csv.ts --persona=hypergrowth --out=./sample.csv
 ```
 
 ---
@@ -153,6 +166,10 @@ in the PRD as v1.1+/v2 scope rather than stubbed with fake UI.
 ## Project layout
 
 ```
+package.json                  # workspace root — dev/build/db scripts, concurrently
+pnpm-workspace.yaml           # packages: [backend, frontend] + pnpm build-approval list
+pnpm-lock.yaml                # single lockfile for the whole monorepo
+docker-compose.yml            # Postgres only (optional, full mode)
 backend/
   prisma/schema.prisma       # Company (+ runway thresholds), CompanyMembership, MetricSnapshot, CohortEntry, AuditLog, InvestorInvite
   prisma/seed.ts             # seeds all 3 personas via the shared generator

@@ -1,0 +1,24 @@
+{
+  "name": "runway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runway — investor-grade metrics for founders (pnpm monorepo: backend + frontend)",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:api": "pnpm --filter runway-backend run dev",
+    "dev:web": "pnpm --filter runway-frontend run dev",
+    "dev:db": "docker compose up -d postgres",
+    "db:stop": "docker compose stop postgres",
+    "build": "pnpm -r run build",
+    "db:generate": "pnpm --filter runway-backend run prisma:generate",
+    "db:migrate": "pnpm --filter runway-backend run prisma:migrate",
+    "db:seed": "pnpm --filter runway-backend run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

@@ -4,10 +4,12 @@
   "private": true,
   "description": "Runway — investor-grade metrics API for founders",
   "scripts": {
+    "dev": "nest start --watch",
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts",
