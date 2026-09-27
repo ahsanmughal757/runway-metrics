@@ -25,7 +25,7 @@ const inputClassNames = {
 };
 
 export function InvestorUpdate() {
-  const { role } = useCompany();
+  const { can } = useCompany();
   const { push } = useToast();
   const [sections, setSections] = useState(defaultSections);
   const [periodLabel, setPeriodLabel] = useState(
@@ -50,24 +50,13 @@ export function InvestorUpdate() {
   async function exportPdf() {
     setGenerating(true);
     try {
-      const token = localStorage.getItem('runway_token');
-      const demoCompanyId = localStorage.getItem('runway_demo_company_id') ?? '';
-      const demoRole = localStorage.getItem('runway_demo_role') ?? '';
-      const res = await fetch('/api/reports/investor-update', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          'X-Demo-Company-Id': demoCompanyId,
-          'X-Demo-Role': demoRole,
-        },
-        body: JSON.stringify({ periodLabel, narrativeSections: sections }),
+      // Goes through the api client rather than a bare fetch so the PDF
+      // request carries the same auth and company headers, and gets the same
+      // refresh-on-401 behaviour as every other call.
+      const blob = await api.post<Blob>('/reports/investor-update', {
+        periodLabel,
+        narrativeSections: sections,
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message ?? 'Failed to generate PDF');
-      }
-      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -82,12 +71,12 @@ export function InvestorUpdate() {
     }
   }
 
-  if (role !== 'FOUNDER') {
+  if (!can('reports:generate')) {
     return (
       <EmptyState
         icon={Lock}
-        title="Founder-only tool"
-        description="The Investor Update Builder is Founder-only. Switch to the Founder view (top right) to generate a report."
+        title="Not available for your role"
+        description="Generating an investor update needs the reports:generate permission. An Analyst or above can do this; a Viewer cannot."
       />
     );
   }

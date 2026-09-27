@@ -4,6 +4,7 @@ import { Command, Moon, Sun, UserRound, Building2, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../lib/CompanyContext';
 import { useAuth } from '../lib/AuthContext';
+import { ROLE_LABELS, ROLES, type Role } from '../lib/permissions';
 import type { AppTheme} from '../lib/theme';
 import { applyTheme, getStoredTheme, setStoredTheme } from '../lib/theme';
 import { NotificationsBell } from './NotificationsBell';
@@ -68,23 +69,25 @@ export function TopBar() {
           <kbd className="ml-1 text-[10px] border border-runway-border rounded-md px-1 py-0.5 bg-runway-charcoal">⌘K</kbd>
         </button>
 
-        {/* Demo-only viewpoint toggle. The server enforces role via RolesGuard
-            regardless of this switch — see auth/bypass-auth.guard.ts. */}
+        {/* Demo-only viewpoint toggle. The server re-derives permissions from
+            whichever role is assumed, so this cannot show a capability the real
+            product would refuse - see auth/bypass-auth.guard.ts. */}
         <Tabs
           aria-label="Viewpoint"
           size="sm"
           selectedKey={role}
-          onSelectionChange={(key) => setRole(key as 'FOUNDER' | 'INVESTOR')}
+          onSelectionChange={(key) => setRole(key as Role)}
           color="primary"
           variant="solid"
           classNames={{
             tabList: 'bg-white/[0.03] border border-runway-border/70 rounded-xl p-1',
-            tab: 'text-runway-muted data-[selected=true]:text-white rounded-lg',
+            tab: 'text-runway-muted data-[selected=true]:text-white rounded-lg text-xs',
             cursor: 'bg-accent-gradient shadow-glow',
           }}
         >
-          <Tab key="FOUNDER" title="Founder" />
-          <Tab key="INVESTOR" title="Investor" />
+          {ROLES.map((r) => (
+            <Tab key={r} title={ROLE_LABELS[r]} />
+          ))}
         </Tabs>
 
         <NotificationsBell />

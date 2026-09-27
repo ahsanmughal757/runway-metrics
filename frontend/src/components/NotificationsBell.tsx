@@ -1,23 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, FileText, Upload as UploadIcon, UserPlus, TrendingUp } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-
-interface ActivityItem {
-  id: string;
-  entityType: string;
-  action: string;
-  changedBy: string;
-  changedAt: string;
-}
-
-const iconFor: Record<string, typeof Bell> = {
-  MetricSnapshot: TrendingUp,
-  InvestorInvite: UserPlus,
-  Report: FileText,
-  Csv: UploadIcon,
-};
+import { ACTION_VERBS, ENTITY_ICONS, ENTITY_LABELS, type ActivityItem } from '../lib/audit';
 
 function timeAgo(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -72,7 +58,7 @@ export function NotificationsBell() {
                   <p className="text-xs text-runway-muted text-center py-8">Nothing yet.</p>
                 )}
                 {items.map((item) => {
-                  const Icon = iconFor[item.entityType] ?? Bell;
+                  const Icon = ENTITY_ICONS[item.entityType] ?? Bell;
                   return (
                     <div key={item.id} className="flex items-start gap-3 px-4 py-3 border-b border-runway-border/40 last:border-0 hover:bg-white/[0.02] transition-colors">
                       <span className="w-7 h-7 rounded-lg bg-runway-accent/10 border border-runway-accent/20 flex items-center justify-center shrink-0 mt-0.5">
@@ -80,7 +66,10 @@ export function NotificationsBell() {
                       </span>
                       <div className="min-w-0">
                         <p className="text-xs text-runway-text leading-relaxed">
-                          <span className="font-semibold">{item.changedBy}</span> <span className="text-runway-muted">{item.action}</span>
+                          <span className="font-semibold">{item.changedBy}</span>{' '}
+                          <span className="text-runway-muted">
+                            {ACTION_VERBS[item.action] ?? item.action} {ENTITY_LABELS[item.entityType] ?? item.entityType}
+                          </span>
                         </p>
                         <p className="text-[11px] text-runway-muted mt-0.5">{timeAgo(item.changedAt)}</p>
                       </div>

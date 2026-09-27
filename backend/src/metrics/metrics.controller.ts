@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../auth/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CompanyScopeGuard } from '../common/guards/company-scope.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { MetricsService } from './metrics.service';
 import { UpsertSnapshotDto, ImportCsvDto } from './dto';
@@ -12,11 +12,13 @@ import { PERSONAS, PersonaKey } from '../fake-data/personas';
 import { BENCHMARKS, percentileFor } from '../fake-data/benchmarks';
 
 @Controller('metrics')
-@UseGuards(AuthGuard, RolesGuard, CompanyScopeGuard)
+@UseGuards(AuthGuard, CompanyScopeGuard)
 export class MetricsController {
   constructor(private metrics: MetricsService) {}
 
   @Get('dashboard')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('metrics:read')
   getDashboard(@CurrentUser() user: RequestUser) {
     return this.metrics.getDashboard(user.companyId);
   }
@@ -58,27 +60,33 @@ export class MetricsController {
     };
   }
 
-  // Founder-only: investors get read access via /dashboard, never write access.
+  // Read access is company-wide; writing numbers is for ANALYST and above. A
+  // VIEWER - which is what an investor should be given - gets the dashboard and
+  // nothing else.
   @Post('snapshot')
-  @Roles('FOUNDER')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('metrics:write')
   upsertSnapshot(@CurrentUser() user: RequestUser, @Body() dto: UpsertSnapshotDto) {
     return this.metrics.upsertSnapshot({ ...dto, companyId: user.companyId, month: new Date(dto.month), actorId: user.userId });
   }
 
   @Delete('snapshot/:month')
-  @Roles('FOUNDER')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('metrics:write')
   deleteSnapshot(@CurrentUser() user: RequestUser, @Param('month') month: string) {
     return this.metrics.deleteSnapshot(user.companyId, new Date(month), user.userId);
   }
 
   @Post('import/preview')
-  @Roles('FOUNDER')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('metrics:write')
   previewCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
     return this.metrics.parseCsvPreview(user.companyId, dto.csv);
   }
 
   @Post('import/commit')
-  @Roles('FOUNDER')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('metrics:write')
   commitCsv(@CurrentUser() user: RequestUser, @Body() dto: ImportCsvDto) {
     return this.metrics.importAndCommit(user.companyId, dto.csv, user.userId);
   }

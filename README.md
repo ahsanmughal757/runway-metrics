@@ -2,14 +2,15 @@
 
 Portfolio project #2 (Ledgerly's sibling — same architectural pattern, reskinned).
 A founder's metrics dashboard whose real output is a polished **PDF investor
-update**, with server-enforced Founder/Investor roles and a cohort retention
-table built on a realistically-modeled fake-data generator.
+update**, with server-enforced `OWNER`/`ADMIN`/`ANALYST`/`VIEWER` roles over
+relational multi-tenant data, and a cohort retention table computed by the
+database rather than in JavaScript.
 
 **v2 revamp:** new design system (deeper navy palette, amber 2nd accent,
 condensed type scale, motion via framer-motion), a bento-grid dashboard with
 KPI→chart drill-down and animated count-up numbers, a command palette (⌘K),
 toast notifications, a real notifications feed, configurable runway
-thresholds, an investor-invite screen, cross-persona comparison, CSV export,
+thresholds, a member-invite screen, cross-persona comparison, CSV export,
 and Login/Signup screens wired to the existing JWT backend.
 
 ## Stack
@@ -60,9 +61,9 @@ Every API route is live — dashboard, cohorts,
 metrics entry, CSV import/export, PDF export, settings, invites, comparison,
 notifications — served from the persona-based fake data generator instead of
 Postgres. The company switcher (top bar) flips between three seeded personas
-(steady grower / hypergrowth-then-plateau / struggling), and the
-Founder/Investor toggle demonstrates the read-only Investor experience.
-Press **⌘K** anywhere to jump between screens.
+(steady grower / hypergrowth-then-plateau / struggling), and the role switcher
+demonstrates each of the four permission levels. Press **⌘K** anywhere to jump
+between screens.
 
 `BYPASS_AUTH=true` must never be set outside local development —
 `src/config/env.ts` throws at boot if it's combined with `NODE_ENV=production`.
@@ -74,20 +75,51 @@ pnpm dev:db                     # starts Postgres on :5432
 cp backend/.env.example backend/.env
 # set ENABLE_DATABASE=true, BYPASS_AUTH=false
 pnpm db:migrate
-pnpm db:seed                    # seeds all 3 personas + demo users
+pnpm db:seed                    # seeds 3 demo companies + demo users
 pnpm dev
 ```
 
-Demo logins after seeding: `demo.founder@runway.local` /
-`demo.investor@runway.local`, password `demo-password-123`. The `/login` and
-`/signup` screens are wired to the real `auth.controller.ts` endpoints in
-this mode.
+Demo logins after seeding: `demo.owner@runway.local` /
+`demo.analyst@runway.local` / `demo.viewer@runway.local`, password
+`demo-password-123`. The `/login` and `/signup` screens are wired to the real
+`auth.controller.ts` endpoints in this mode.
 
 Generate a standalone sample CSV (same generator, no server needed):
 
 ```bash
 pnpm --filter runway-backend exec ts-node scripts/generate-csv.ts --persona=hypergrowth --out=./sample.csv
 ```
+
+---
+
+## Tests
+
+```bash
+pnpm test            # unit, no database          (backend/test/*.spec.ts)
+pnpm test:e2e        # HTTP in-process, no database (backend/test/app.e2e-spec.ts)
+pnpm test:db         # real PostgreSQL             (backend/test/db/*.db-spec.ts)
+pnpm verify          # lint + typecheck + unit + e2e + build   (no Docker needed)
+pnpm verify:full     # the above, plus test:db                (needs Postgres: pnpm dev:db)
+```
+
+`test:db` creates and migrates its own `runway_test` database, then truncates
+between tests, so it never touches the development data. It is kept out of
+`verify` rather than folded in because it needs a running database; if you are
+changing anything under `src/`, run `verify:full`.
+
+**Why the third suite exists.** Both other suites run with
+`ENABLE_DATABASE=false` against generated data, which means they cannot see a
+broken query, a missing constraint, or a permission check that only exists in
+the database path. That is not hypothetical: the cohort retention SQL shipped
+with a missing double quote (`c."signupMonth)))::int`), which TypeScript, the
+linter, the unit tests and the e2e tests all passed, and which only showed up
+when the report was called against a real database. If you add a
+`$queryRaw`, a database constraint, or an authorization rule, put it in
+`test/db/` — otherwise nothing will catch it.
+
+Behaviour changes that are not obvious from the code are recorded in
+[CHANGELOG.md](CHANGELOG.md), including one place where the API now accepts input
+it used to reject.
 
 ---
 
@@ -105,8 +137,9 @@ pnpm --filter runway-backend exec ts-node scripts/generate-csv.ts --persona=hype
   `runwayYellowMonths` replace the v1 hardcoded 12/6 split, editable on the
   new **Settings** screen and enforced by the same `metrics.service.ts` logic
   that computes the zone.
-- **Investor Invite screen** — wired to the `InvestorInvite` model and
-  `companies/invites` endpoints that existed in v1 but had no UI.
+- **Member Invite screen** — backed by the `Invite` model and the
+  `companies/invites` endpoints, with a persisted lifecycle (issue, preview,
+  accept, redeem, revoke, expire) rather than the in-memory v1 list.
 - **Notifications feed** — a real bell icon fed by `/audit/recent`, backed by
   the existing `AuditLog` model.
 - **Cross-persona comparison** — `/metrics/compare/:persona` overlays another
@@ -130,13 +163,20 @@ pnpm --filter runway-backend exec ts-node scripts/generate-csv.ts --persona=hype
   Tailwind classes bolted on. The only native form element left is
   `<input type="file">` behind the CSV drop zone, since HeroUI has no
   file-picker primitive.
-- **RBAC is enforced in `RolesGuard` and `CompanyScopeGuard`**, on every
-  protected route — not hidden by conditionally rendering UI. The Founder/
-  Investor toggle in the demo UI only changes *which* server identity gets
-  injected; it never bypasses the guard logic itself.
-- **`companyId` always comes from the authenticated session**, never from a
-  client-supplied param — `CompanyScopeGuard` rejects any mismatch, closing
-  the cross-tenant data leak named as a risk in the PRD.
+- **RBAC is enforced in `PermissionsGuard` and `CompanyScopeGuard`**, on every
+  protected route — not hidden by conditionally rendering UI. The role switcher
+  in the demo UI only changes *which* server identity gets injected; it never
+  bypasses the guard logic itself, and the permissions it renders are re-read
+  from the server rather than recomputed in the browser.
+- **The access token carries identity only** — `sub` and `email`, never a role
+  or a company. `MembershipResolver` asks the database on every request which
+  membership is being acted as and what that entitles the caller to, so a
+  demotion takes effect immediately instead of when an old token expires.
+- **`X-Company-Id` is a request, not a credential** — it selects among the
+  caller's own memberships and is rejected otherwise, so it can choose a
+  company but can never grant access to one. `companyId` therefore always comes
+  from the resolved membership, never from a client-supplied param, closing the
+  cross-tenant data leak named as a risk in the PRD.
 - **One repository layer branches on `ENABLE_DATABASE`**
   (`metrics.repository.ts`, `cohorts.repository.ts`, `companies.repository.ts`);
   controllers and services above it are identical in both modes.
@@ -171,18 +211,20 @@ pnpm-workspace.yaml           # packages: [backend, frontend] + pnpm build-appro
 pnpm-lock.yaml                # single lockfile for the whole monorepo
 docker-compose.yml            # Postgres only (optional, full mode)
 backend/
-  prisma/schema.prisma       # Company (+ runway thresholds), CompanyMembership, MetricSnapshot, CohortEntry, AuditLog, InvestorInvite
-  prisma/seed.ts             # seeds all 3 personas via the shared generator
-  src/config/env.ts          # ENABLE_DATABASE / BYPASS_AUTH, single source of truth
-  src/fake-data/             # persona configs + realistic generator (snapshots + cohorts)
-  src/auth/                  # JWT strategy, AuthGuard (delegates to BypassAuthGuard in demo mode)
-  src/common/guards/         # RolesGuard, CompanyScopeGuard — the actual RBAC enforcement
-  src/metrics/               # repository (DB/fake branch), derived-metrics math, CSV import, comparison endpoint
-  src/cohorts/                # retention table logic (fake-data only, v1)
-  src/companies/              # company list, settings (thresholds), investor invites
+  prisma/schema.prisma         # User, Company (+ runway thresholds), CompanyMembership, Invite, MetricSnapshot, Customer, CustomerMonthlyValue, ShareLink, AuditLog, Session
+  prisma/migrations/           # one squashed baseline; constraints/indexes/triggers that Prisma cannot express
+  prisma/seed.ts               # seeds 3 demo companies via the shared generator, with customers as rows
+  src/config/env.ts            # ENABLE_DATABASE / BYPASS_AUTH, single source of truth
+  src/fake-data/               # persona configs + realistic generator (snapshots + cohorts), for demo mode only
+  src/auth/                    # permissions matrix, MembershipResolver, JwtStrategy, AuthGuard (BypassAuthGuard in demo mode)
+  src/common/guards/           # PermissionsGuard, CompanyScopeGuard — the actual RBAC enforcement
+  src/metrics/                 # repository (DB/fake branch), derived-metrics math, CSV import, comparison endpoint
+  src/cohorts/                 # retention grid; the SQL GROUP BY that v1's JSON-per-customer schema could not express
+  src/companies/               # company list, settings (thresholds), member roles, invite lifecycle
   src/audit/                   # activity feed backing the notifications bell
-  src/reports/                # @react-pdf/renderer investor update document + endpoint
-  scripts/generate-csv.ts    # standalone CLI, same generator, no server needed
+  src/reports/                 # @react-pdf/renderer investor update document + persistent share links
+  scripts/generate-csv.ts      # standalone CLI, same generator, no server needed
+  test/                        # unit + e2e (no database), and test/db/ (real PostgreSQL: invariants, auth/tenancy, cohorts)
 frontend/
   src/components/            # Sidebar, TopBar, KpiCard, CommandPalette, Toast/Skeleton/EmptyState/ErrorBoundary
   src/components/charts/     # restyled Recharts (no gridlines, gradient fills, spike annotations)
@@ -193,14 +235,24 @@ frontend/
 ## Build order (as executed)
 
 **v1:** Schema + toggles → fake data generator → dashboard + trends → cohort
-table → roles + investor invite model → CSV import → PDF export.
+table → roles + invite model → CSV import → PDF export.
 
 **v2 revamp:** Design tokens (Tailwind/HeroUI theme) → shared component
 layer (Toast, Skeleton, EmptyState, CommandPalette, ErrorBoundary) →
 dashboard bento layout + drill-down + count-up + chart annotations → auth
-screens → settings (+ backend threshold fields) → investor invite screen +
+screens → settings (+ backend threshold fields) → invite screen +
 notifications feed → persona comparison + CSV export → motion pass across
 all screens.
 
-Live sockets, an automated test suite, i18n, and real Stripe billing remain
-out of scope, named rather than silently skipped.
+**v3 productionization:** the relational rewrite. `Customer` +
+`CustomerMonthlyValue` replaced the per-customer JSON blob so retention
+becomes a `GROUP BY`; `CompanyMembership` replaced the role on the user;
+tokens were cut down to identity only with `X-Company-Id` resolved against the
+database per request; invites, share links and audit rows became real tables;
+and a real-PostgreSQL suite (`pnpm test:db`) was added because none of the
+above is observable from a unit test with a fake data source.
+
+Live sockets, i18n, and real Stripe billing remain out of scope, named rather
+than silently skipped. Server-side session revocation is also still open:
+`POST /auth/logout` does not exist yet, so logging out clears the browser
+while the token remains valid until it expires.

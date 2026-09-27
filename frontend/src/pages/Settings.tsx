@@ -19,11 +19,11 @@ const inputClassNames = {
 };
 
 export function Settings() {
-  const { activeCompanyId, role } = useCompany();
+  const { activeCompanyId, role, can } = useCompany();
   const { push } = useToast();
   const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [saving, setSaving] = useState(false);
-  const canEdit = role === 'FOUNDER';
+  const canEdit = can('company:update');
 
   useEffect(() => {
     if (!activeCompanyId) return;

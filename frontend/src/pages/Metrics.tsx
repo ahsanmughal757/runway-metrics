@@ -67,7 +67,7 @@ const editableFields: { key: EditableField; label: string; numeric: boolean }[] 
 ];
 
 export function Metrics() {
-  const { activeCompanyId, role } = useCompany();
+  const { activeCompanyId, role, can } = useCompany();
   const { push } = useToast();
   const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
   const [form, setForm] = useState(emptyForm);
@@ -75,7 +75,7 @@ export function Metrics() {
   const [editing, setEditing] = useState<{ month: string; field: EditableField } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [deleting, setDeleting] = useState<Snapshot | null>(null);
-  const canEdit = role === 'FOUNDER';
+  const canEdit = can('metrics:write');
 
   useEffect(() => {
     if (!activeCompanyId) return;

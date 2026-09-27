@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as Papa from 'papaparse';
 import { MetricsRepository, SnapshotInput } from './metrics.repository';
 import { CompaniesRepository } from '../companies/companies.repository';
@@ -46,38 +46,49 @@ export class MetricsService {
     return { snapshots: withDerived, latest };
   }
 
+  /**
+   * Saves a month and records the change, in one transaction.
+   *
+   * Previously the snapshot was written, then the audit entry was written by a
+   * separate call that swallowed its own errors. A failure in between left the
+   * company's numbers changed with no record of who changed them. Sharing a
+   * transaction removes the window: there is no state in which one exists
+   * without the other.
+   */
   async upsertSnapshot(input: SnapshotInput & { actorId: string }) {
     const { actorId, ...rest } = input;
     const monthKey = input.month.toISOString().slice(0, 10);
-    // Audit *after* the write resolves. Auditing first (or in parallel) records
-    // changes that never happened whenever the mutation fails, which is the one
-    // thing an audit trail must never do. `record` swallows its own errors, so
-    // awaiting it cannot fail the request.
-    const saved = await this.repo.upsert(rest);
-    await this.audit.record({
-      companyId: rest.companyId,
-      entityId: `${rest.companyId}:${monthKey}`,
-      entityType: 'MetricSnapshot',
-      action: 'updated',
-      actorId,
+    return this.repo.transaction(async (tx) => {
+      const saved = await this.repo.upsert(rest, tx);
+      await this.audit.recordIn(tx, {
+        companyId: rest.companyId,
+        entityId: `${rest.companyId}:${monthKey}`,
+        entityType: 'METRIC_SNAPSHOT',
+        action: 'UPDATED',
+        actorId,
+        diff: { month: monthKey, mrr: rest.mrr, cash: rest.cash },
+      });
+      return saved;
     });
-    return saved;
   }
 
   async deleteSnapshot(companyId: string, month: Date, actorId: string) {
     const monthKey = month.toISOString().slice(0, 10);
-    const deleted = await this.repo.delete(companyId, month);
-    // A delete that matched nothing is not a change, so it gets no entry.
-    if (deleted) {
-      await this.audit.record({
-        companyId,
-        entityId: `${companyId}:${monthKey}`,
-        entityType: 'MetricSnapshot',
-        action: 'deleted',
-        actorId,
-      });
-    }
-    return deleted;
+    return this.repo.transaction(async (tx) => {
+      const deleted = await this.repo.delete(companyId, month, tx);
+      // A delete that matched nothing is not a change, so it gets no entry.
+      if (deleted) {
+        await this.audit.recordIn(tx, {
+          companyId,
+          entityId: `${companyId}:${monthKey}`,
+          entityType: 'METRIC_SNAPSHOT',
+          action: 'DELETED',
+          actorId,
+          diff: { month: monthKey },
+        });
+      }
+      return deleted;
+    });
   }
   /** Computes runway, NRR, MoM growth, and churn splits for one point in the series using trailing context. */
   private deriveForIndex(all: SnapshotInput[], idx: number, greenMonths: number, yellowMonths: number): DerivedMetrics {
@@ -193,21 +204,37 @@ export class MetricsService {
   }
 
   async commitCsv(companyId: string, rows: SnapshotInput[], actorId: string) {
-    const committed = await this.repo.importCsvRows(companyId, rows);
-    await this.audit.record({
-      companyId,
-      entityId: `import:${new Date().toISOString()}`,
-      entityType: 'MetricSnapshot',
-      action: 'imported',
-      actorId,
-      diff: { rowCount: committed, firstMonth: rows[0]?.month.toISOString().slice(0, 7) ?? null, lastMonth: rows.at(-1)?.month.toISOString().slice(0, 7) ?? null },
+    return this.repo.transaction(async (tx) => {
+      const committed = await this.repo.importCsvRows(tx, companyId, rows);
+      await this.audit.recordIn(tx, {
+        companyId,
+        entityId: `import:${new Date().toISOString()}`,
+        entityType: 'METRIC_SNAPSHOT',
+        action: 'IMPORTED',
+        actorId,
+        diff: {
+          rowCount: committed,
+          firstMonth: rows[0]?.month.toISOString().slice(0, 7) ?? null,
+          lastMonth: rows.at(-1)?.month.toISOString().slice(0, 7) ?? null,
+        },
+      });
+      return committed;
     });
-    return committed;
   }
 }
 
+/**
+ * Both of these report a bad cell in the uploaded file.
+ *
+ * They throw BadRequest rather than a plain Error so a malformed CSV is a 400
+ * rather than a 500. The message deliberately includes the offending value: the
+ * user is looking at a spreadsheet, so telling them *which* cell is wrong is
+ * the difference between a fixable report and a support ticket.
+ */
 function num(v: string | undefined): number {
-  if (v === undefined || v === '' || Number.isNaN(Number(v))) throw new Error(`invalid numeric value "${v}"`);
+  if (v === undefined || v === '' || Number.isNaN(Number(v))) {
+    throw new BadRequestException(`"${v ?? ''}" is not a number. Check the column it is in.`);
+  }
   return Number(v);
 }
 
@@ -219,6 +246,8 @@ function num(v: string | undefined): number {
  */
 function parseMonth(v: string | undefined): Date {
   const d = new Date(v ?? '');
-  if (Number.isNaN(d.getTime())) throw new Error(`invalid month date "${v ?? ''}"`);
+  if (Number.isNaN(d.getTime())) {
+    throw new BadRequestException(`"${v ?? ''}" is not a date. Use YYYY-MM-DD, e.g. 2026-01-31.`);
+  }
   return d;
 }

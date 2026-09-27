@@ -1,56 +1,72 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { AuditAction, AuditEntityType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { env } from '../config/env';
 
+export type { AuditAction, AuditEntityType };
+
+/** The subset of PrismaService that a transaction exposes, and the only thing audit writes ever need. */
+export type AuditTx = Prisma.TransactionClient;
+
 export interface ActivityItem {
   id: string;
-  entityType: string;
-  action: string;
+  entityType: AuditEntityType;
+  action: AuditAction;
   changedBy: string;
   changedAt: string;
 }
-
-/**
- * Closed sets rather than free strings: an audit trail nobody can query is
- * worthless, and typos in `action` silently create unscannable buckets.
- */
-export type AuditEntityType =
-  | 'MetricSnapshot'
-  | 'Customer'
-  | 'CohortEntry'
-  | 'Company'
-  | 'CompanySettings'
-  | 'CompanyMembership'
-  | 'InvestorInvite'
-  | 'ShareLink'
-  | 'Report'
-  | 'User';
-
-export type AuditAction = 'created' | 'updated' | 'deleted' | 'imported' | 'generated' | 'shared' | 'invited';
 
 export interface RecordAuditInput {
   companyId: string;
   entityId: string;
   entityType: AuditEntityType;
   action: AuditAction;
-  /** The acting user's id. Falls back to the bypass demo user in demo mode. */
+  /** The acting user's id. */
   actorId: string;
   diff?: unknown;
+}
+
+/** Human-readable phrasing for the activity feed, kept next to the enum it renders. */
+const ACTION_PHRASES: Record<AuditAction, string> = {
+  CREATED: 'created',
+  UPDATED: 'updated',
+  DELETED: 'deleted',
+  IMPORTED: 'imported',
+  INVITED: 'invited',
+  ACCEPTED: 'accepted',
+  REVOKED: 'revoked',
+  GENERATED: 'generated',
+  SHARED: 'shared',
+  VIEWED: 'viewed',
+};
+
+const ENTITY_PHRASES: Record<AuditEntityType, string> = {
+  COMPANY_SETTINGS: 'company settings',
+  MEMBER: 'a team member',
+  CUSTOMER: 'a customer',
+  METRIC_SNAPSHOT: 'a monthly snapshot',
+  INVITE: 'an invitation',
+  REPORT: 'the investor update',
+  SHARE_LINK: 'a share link',
+};
+
+export function describeAudit(input: { entityType: AuditEntityType; action: AuditAction }): string {
+  return `${ACTION_PHRASES[input.action]} ${ENTITY_PHRASES[input.entityType]}`;
 }
 
 // In-memory feed for demo/BYPASS_AUTH mode, seeded with a few plausible
 // events so the Notifications panel isn't empty on first load.
 const demoFeed: Record<string, ActivityItem[]> = {
   'demo-company-steady': [
-    { id: 'a1', entityType: 'MetricSnapshot', action: 'added snapshot for last month', changedBy: 'Demo Founder', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString() },
-    { id: 'a2', entityType: 'InvestorInvite', action: 'invited an investor', changedBy: 'Demo Founder', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString() },
-    { id: 'a3', entityType: 'Report', action: 'generated the investor update PDF', changedBy: 'Demo Founder', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString() },
+    { id: 'a1', entityType: 'METRIC_SNAPSHOT', action: 'UPDATED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString() },
+    { id: 'a2', entityType: 'INVITE', action: 'INVITED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString() },
+    { id: 'a3', entityType: 'REPORT', action: 'GENERATED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString() },
   ],
   'demo-company-hypergrowth': [
-    { id: 'a4', entityType: 'MetricSnapshot', action: 'imported 6 snapshots via CSV', changedBy: 'Demo Founder', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() },
+    { id: 'a4', entityType: 'METRIC_SNAPSHOT', action: 'IMPORTED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() },
   ],
   'demo-company-struggling': [
-    { id: 'a5', entityType: 'MetricSnapshot', action: 'added snapshot for last month', changedBy: 'Demo Founder', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString() },
+    { id: 'a5', entityType: 'METRIC_SNAPSHOT', action: 'UPDATED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString() },
   ],
 };
 
@@ -61,26 +77,59 @@ export class AuditService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Append-only trail of every state change in a company.
+   * Append an audit entry *inside* a caller's transaction.
    *
-   * Deliberately does not throw. A failed audit insert must not roll back or
-   * 500 a founder's saved month — the data change already happened, and
-   * losing it because bookkeeping failed is strictly worse. Failures are
-   * logged at error level with full context so they are alertable, and the
-   * reconciler can backfill. Phase 2 moves these writes into the same
-   * transaction as the mutation they describe, which closes the gap properly.
+   * This is the correct way to write to the trail. Passing the transaction
+   * client means the audit row and the change it describes commit together or
+   * not at all, which is the whole point of having a trail: there is no longer
+   * a window where the numbers changed and the log says otherwise, and no
+   * orphan entry describing a change that rolled back.
+   *
+   * Note that it does not swallow errors, unlike `record`. Inside a
+   * transaction, catching a failure and continuing would commit a change with
+   * no audit row - precisely the gap this method exists to close. If the audit
+   * insert fails, the whole transaction fails and the caller retries.
+   */
+  recordIn(tx: AuditTx, input: RecordAuditInput): Promise<unknown> {
+    return tx.auditLog.create({
+      data: {
+        companyId: input.companyId,
+        entityId: input.entityId,
+        entityType: input.entityType,
+        action: input.action,
+        changedBy: input.actorId,
+        diff: input.diff as Prisma.InputJsonValue | undefined,
+      },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Standalone audit write, for the rare case where there is no mutation to be
+   * atomic with (a public share-link view, a rejected invite).
+   *
+   * Still non-throwing: here there is no data change to protect, so failing the
+   * request over a bookkeeping row would be the wrong trade. Failures are
+   * logged at error level so they are alertable.
    */
   async record(input: RecordAuditInput): Promise<void> {
     if (!env.ENABLE_DATABASE) return; // no-op in demo mode
 
-    const { companyId, entityId, entityType, action, actorId, diff } = input;
     try {
       await this.prisma.auditLog.create({
-        data: { companyId, entityId, entityType, action, changedBy: actorId, diff: diff as never },
+        data: {
+          companyId: input.companyId,
+          entityId: input.entityId,
+          entityType: input.entityType,
+          action: input.action,
+          changedBy: input.actorId,
+          diff: input.diff as Prisma.InputJsonValue | undefined,
+        },
+        select: { id: true },
       });
     } catch (err) {
       this.logger.error(
-        { err, companyId, entityId, entityType, action, actorId },
+        { err, ...input },
         'Failed to write audit log entry',
       );
     }
@@ -94,13 +143,7 @@ export class AuditService {
         take: 20,
         include: { user: true },
       });
-      return rows.map((r) => ({
-        id: r.id,
-        entityType: r.entityType,
-        action: r.action,
-        changedBy: r.user?.name ?? r.user?.email ?? r.changedBy,
-        changedAt: r.changedAt.toISOString(),
-      }));
+      return rows.map(toActivityItem);
     }
     return demoFeed[companyId] ?? [];
   }
@@ -109,7 +152,7 @@ export class AuditService {
   async list(companyId: string, opts: { page?: number; pageSize?: number; entityType?: string }): Promise<{ items: ActivityItem[]; total: number; page: number; pageSize: number }> {
     const page = Math.max(1, opts.page ?? 1);
     const pageSize = Math.min(50, Math.max(1, opts.pageSize ?? 15));
-    const entityType = opts.entityType || undefined;
+    const entityType = asEntityType(opts.entityType);
 
     if (env.ENABLE_DATABASE) {
       const where = { companyId, ...(entityType ? { entityType } : {}) };
@@ -123,18 +166,7 @@ export class AuditService {
         }),
         this.prisma.auditLog.count({ where }),
       ]);
-      return {
-        items: rows.map((r) => ({
-          id: r.id,
-          entityType: r.entityType,
-          action: r.action,
-          changedBy: r.user?.name ?? r.user?.email ?? r.changedBy,
-          changedAt: r.changedAt.toISOString(),
-        })),
-        total,
-        page,
-        pageSize,
-      };
+      return { items: rows.map(toActivityItem), total, page, pageSize };
     }
 
     let feed = demoFeed[companyId] ?? [];
@@ -146,4 +178,24 @@ export class AuditService {
       pageSize,
     };
   }
+}
+
+type AuditRow = Prisma.AuditLogGetPayload<{ include: { user: true } }>;
+
+function toActivityItem(r: AuditRow): ActivityItem {
+  return {
+    id: r.id,
+    entityType: r.entityType,
+    action: r.action,
+    changedBy: r.user?.name ?? r.user?.email ?? r.changedBy,
+    changedAt: r.changedAt.toISOString(),
+  };
+}
+
+/** The filter arrives as a query string, so it is validated rather than trusted. */
+function asEntityType(value: string | undefined): AuditEntityType | undefined {
+  if (!value) return undefined;
+  return (Object.values(AuditEntityType) as string[]).includes(value)
+    ? (value as AuditEntityType)
+    : undefined;
 }

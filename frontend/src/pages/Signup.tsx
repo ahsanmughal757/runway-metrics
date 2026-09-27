@@ -18,6 +18,7 @@ export function Signup() {
   const { push } = useToast();
   const navigate = useNavigate();
   const [name, setName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -28,7 +29,7 @@ export function Signup() {
     setSubmitting(true);
     setError(null);
     try {
-      await register(email, password, name || undefined);
+      await register({ email, password, name: name || undefined, companyName });
       push('Account created.', 'success');
       navigate('/');
     } catch (err) {
@@ -55,12 +56,22 @@ export function Signup() {
           <div className="relative flex flex-col gap-4">
             <div>
               <h1 className="text-lg font-semibold text-runway-text">Create an account</h1>
-              <p className="text-sm text-runway-muted mt-0.5">Requires ENABLE_DATABASE=true on the API.</p>
+              <p className="text-sm text-runway-muted mt-0.5">You will be the owner of the company you create.</p>
             </div>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-              <Input label="Name" size="sm" variant="bordered" value={name} onValueChange={setName} classNames={inputClassNames} />
+              <Input label="Your name" size="sm" variant="bordered" value={name} onValueChange={setName} classNames={inputClassNames} />
+              <Input
+                label="Company"
+                size="sm"
+                variant="bordered"
+                value={companyName}
+                onValueChange={setCompanyName}
+                classNames={inputClassNames}
+                isRequired
+                description="The workspace you will own. You can invite teammates once you are in."
+              />
               <Input label="Email" type="email" size="sm" variant="bordered" value={email} onValueChange={setEmail} classNames={inputClassNames} isRequired />
-              <Input label="Password" type="password" size="sm" variant="bordered" value={password} onValueChange={setPassword} classNames={inputClassNames} isRequired description="Minimum 8 characters" />
+              <Input label="Password" type="password" size="sm" variant="bordered" value={password} onValueChange={setPassword} classNames={inputClassNames} isRequired minLength={8} description="Minimum 8 characters" />
               {error && <p className="text-xs text-runway-negative">{error}</p>}
               <Button type="submit" color="primary" size="sm" isLoading={submitting} fullWidth className="bg-accent-gradient font-medium">
                 Create account

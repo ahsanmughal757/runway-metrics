@@ -2,9 +2,9 @@ import { Body, Controller, Header, Post, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { IsArray, IsString } from 'class-validator';
 import { AuthGuard } from '../auth/auth.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
 import { CompanyScopeGuard } from '../common/guards/company-scope.guard';
-import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentUser, RequestUser } from '../common/decorators/current-user.decorator';
 import { MetricsService } from '../metrics/metrics.service';
 import { CompaniesRepository } from '../companies/companies.repository';
@@ -22,7 +22,7 @@ class GenerateReportDto {
 }
 
 @Controller('reports')
-@UseGuards(AuthGuard, RolesGuard, CompanyScopeGuard)
+@UseGuards(AuthGuard, CompanyScopeGuard)
 export class ReportsController {
   constructor(
     private metrics: MetricsService,
@@ -30,9 +30,11 @@ export class ReportsController {
     private audit: AuditService,
   ) {}
 
-  // Founder builds/exports the update; investors receive the PDF, they don't generate it.
+  // ANALYST and above build the update. Investors receive the PDF; they do not
+  // author it, which is why this is a permission and not a role name.
   @Post('investor-update')
-  @Roles('FOUNDER')
+  @UseGuards(PermissionsGuard)
+  @RequirePermission('reports:generate')
   @Header('Content-Type', 'application/pdf')
   async generateInvestorUpdate(
     @CurrentUser() user: RequestUser,
@@ -59,11 +61,14 @@ export class ReportsController {
       generatedAt: new Date().toLocaleDateString('en-US', { dateStyle: 'medium' }),
     });
     res.setHeader('Content-Disposition', 'attachment; filename="investor-update.pdf"');
+    // No transaction here, and deliberately so: generating a report reads data
+    // and writes nothing, so there is no mutation for the audit entry to be
+    // atomic with. This is the standalone `record` path, not the `recordIn` one.
     await this.audit.record({
       companyId: user.companyId,
       entityId: `report:${dto.periodLabel}`,
-      entityType: 'Report',
-      action: 'generated',
+      entityType: 'REPORT',
+      action: 'GENERATED',
       actorId: user.userId,
       diff: { periodLabel: dto.periodLabel, sectionCount: dto.narrativeSections.length },
     });

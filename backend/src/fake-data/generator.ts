@@ -17,11 +17,21 @@ export interface GeneratedSnapshot {
   cash: number;
 }
 
-export interface GeneratedCohort {
-  customerId: string;
+/**
+ * A customer and what it was worth each month, in the shape the database
+ * actually stores.
+ *
+ * The previous version emitted one object per customer carrying a JSON map of
+ * months, because that was all the old `CohortEntry` table could hold. Now that
+ * a month is a row, the generator emits rows too, so seeding is a direct
+ * translation with no reshaping step to get wrong.
+ */
+export interface GeneratedCustomer {
+  externalId: string;
   signupMonth: Date;
   status: 'active' | 'churned';
-  mrrByMonth: Record<string, number>;
+  churnedAt: Date | null;
+  values: { month: Date; mrr: number }[];
 }
 
 function seasonalDipFactor(monthDate: Date): number {
@@ -149,12 +159,12 @@ export function generateSnapshots(personaKey: PersonaKey, months = 24, startDate
  * uniformly. Hypergrowth cohorts are larger but start with slightly worse
  * early retention — a deliberate, realistic trade-off per the PRD.
  *
- * Fully deterministic, including the generated customer UUIDs, so a seeded
+ * Fully deterministic, including the generated customer identifiers, so a seeded
  * database and a demo-mode request produce identical cohorts.
  */
-export function generateCohorts(personaKey: PersonaKey, cohortMonths = 12, trackMonths = 12, startDate = new Date(Date.UTC(2024, 0, 1))): GeneratedCohort[] {
+export function generateCohorts(personaKey: PersonaKey, cohortMonths = 12, trackMonths = 12, startDate = new Date(Date.UTC(2024, 0, 1))): GeneratedCustomer[] {
   const p = PERSONAS[personaKey];
-  const cohorts: GeneratedCohort[] = [];
+  const customers: GeneratedCustomer[] = [];
 
   const seed = seedFrom('cohorts', personaKey, cohortMonths, trackMonths, startDate.toISOString());
   const rng = createRng(seed);
@@ -162,46 +172,48 @@ export function generateCohorts(personaKey: PersonaKey, cohortMonths = 12, track
   // can never hand out colliding UUIDs.
   faker.seed(seedFrom('cohort-ids', seed));
 
+  const addMonth = (base: Date, offset: number) =>
+    new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1));
+
   for (let c = 0; c < cohortMonths; c++) {
     const signupMonth = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + c, 1));
     const size = rng.int(...p.cohortSize);
 
     for (let n = 0; n < size; n++) {
-      const customerId = faker.string.uuid();
+      const externalId = faker.string.uuid();
       const baseArpu = rng.float(60, 220);
       let alive = true;
-      const mrrByMonth: Record<string, number> = {};
+      let churnedAt: Date | null = null;
+      const values: { month: Date; mrr: number }[] = [];
       let currentMrr = baseArpu;
 
       const monthsAvailable = Math.min(trackMonths, cohortMonths - c + trackMonths);
       for (let t = 0; t < monthsAvailable; t++) {
-        if (!alive) break;
         // steep early churn risk, flattening tail
         const earlyFactor = t < 3 ? p.cohortEarlyChurnMultiplier : t < 6 ? 1.3 : 0.6;
         const churnChance = p.baseChurnRate * earlyFactor;
 
         if (t > 0 && rng.next() < churnChance) {
           alive = false;
-          mrrByMonth[String(t)] = 0;
+          // The churn month is written as an explicit zero row rather than an
+          // absent one. A missing row is indistinguishable from "had not
+          // started yet", and the retention maths would read it as still active.
+          values.push({ month: addMonth(signupMonth, t), mrr: 0 });
+          churnedAt = addMonth(signupMonth, t);
           break;
         }
         // slight expansion drift for non-struggling personas
         if (t > 0 && p.expansionMrrRate > 0 && rng.next() < 0.15) {
           currentMrr *= 1 + rng.float(0.05, 0.2);
         }
-        mrrByMonth[String(t)] = round2(currentMrr);
+        values.push({ month: addMonth(signupMonth, t), mrr: round2(currentMrr) });
       }
 
-      cohorts.push({
-        customerId,
-        signupMonth,
-        status: alive ? 'active' : 'churned',
-        mrrByMonth,
-      });
+      customers.push({ externalId, signupMonth, status: alive ? 'active' : 'churned', churnedAt, values });
     }
   }
 
-  return cohorts;
+  return customers;
 }
 
 export function round2(n: number): number {

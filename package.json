@@ -21,9 +21,11 @@
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm --filter runway-backend run test",
     "test:e2e": "pnpm --filter runway-backend run test:e2e",
+    "test:db": "pnpm --filter runway-backend run test:db",
     "format": "pnpm -r run format",
     "format:check": "pnpm -r run format:check",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run test:e2e && pnpm run build",
+    "verify:full": "pnpm run verify && pnpm run test:db",
     "secrets": "node scripts/generate-secrets.mjs"
   },
   "devDependencies": {

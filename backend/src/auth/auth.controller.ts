@@ -1,18 +1,27 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { IsEmail, IsOptional, MinLength, MaxLength } from 'class-validator';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Transform } from 'class-transformer';
+import { Trim } from '../common/email';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { AuthGuard } from './auth.guard';
+import { CurrentUser, type RequestUser } from '../common/decorators/current-user.decorator';
 import { env } from '../config/env';
 
 class RegisterDto {
+  @Transform(Trim)
+
   @IsEmail() email!: string;
   // Upper bound matters: without it a huge body of 'a' reaches bcrypt, which
   // is deliberately slow, and turns a public endpoint into a CPU DoS.
   @MinLength(8) @MaxLength(200) password!: string;
-  @IsOptional() @MaxLength(120) name?: string;
+  @IsString() @MinLength(2) @MaxLength(120) companyName!: string;
+  @IsOptional() @IsString() @MaxLength(120) name?: string;
 }
 
 class LoginDto {
+  @Transform(Trim)
+
   @IsEmail() @MaxLength(254) email!: string;
   @MaxLength(200) password!: string;
 }
@@ -50,12 +59,24 @@ export class AuthController {
   @Post('register')
   @credentialThrottle
   register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto.email, dto.password, dto.name);
+    return this.authService.register(dto.email, dto.password, dto.companyName, dto.name);
   }
 
   @Post('login')
+  @HttpCode(200)
   @credentialThrottle
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto.email, dto.password);
+  }
+
+  /**
+   * The client calls this once at startup to learn who it is and what it may
+   * do. Every capability it renders from comes from the server's permission
+   * table, so the two can never drift.
+   */
+  @Get('me')
+  @UseGuards(AuthGuard)
+  me(@CurrentUser() user: RequestUser) {
+    return this.authService.me(user);
   }
 }

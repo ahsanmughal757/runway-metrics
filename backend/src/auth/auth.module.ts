@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthGuard } from './auth.guard';
+import { MembershipResolver } from './membership.resolver';
 import { env } from '../config/env';
 
 @Module({
@@ -18,8 +19,8 @@ import { env } from '../config/env';
       signOptions: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS },
     }),
   ],
-  providers: [AuthService, JwtStrategy, AuthGuard],
+  providers: [AuthService, JwtStrategy, AuthGuard, MembershipResolver],
   controllers: [AuthController],
-  exports: [AuthGuard, JwtModule],
+  exports: [AuthGuard, MembershipResolver, JwtModule],
 })
 export class AuthModule {}

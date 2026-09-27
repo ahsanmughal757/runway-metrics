@@ -16,7 +16,7 @@ const links = [
 ];
 
 const secondaryLinks = [
-  { to: '/invites', label: 'Investor Invites', icon: UserPlus },
+  { to: '/invites', label: 'Invites', icon: UserPlus },
   { to: '/team', label: 'Team', icon: UserCog },
   { to: '/activity', label: 'Activity', icon: Activity },
   { to: '/integrations', label: 'Integrations', icon: Plug },
@@ -82,7 +82,7 @@ export function Sidebar() {
           </div>
           <div className="min-w-0">
             <p className="text-xs font-medium text-runway-text truncate">Demo Founder</p>
-            <p className="text-[10px] text-runway-muted">Founder · Runway</p>
+            <p className="text-[10px] text-runway-muted">Owner · Runway</p>
           </div>
         </div>
       </div>

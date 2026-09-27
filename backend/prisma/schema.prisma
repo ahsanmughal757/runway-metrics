@@ -1,3 +1,14 @@
+// Runway data model.
+//
+// This is the second and final baseline migration. The first baseline was
+// generated before the schema was understood, so it was squashed: there is no
+// production data to preserve, and a single honest baseline is easier to reason
+// about than a chain of throwaway migrations.
+//
+// Tenant boundary: every business table carries companyId and cascades from
+// Company. Membership is the only way a user reaches a company, and the role
+// enum is the single source of truth for what a member may do.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,127 +18,262 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Ordered by privilege. The backend derives concrete permissions from these
+// (see src/auth/permissions.ts); nothing else may invent role semantics.
 enum MembershipRole {
-  FOUNDER
-  INVESTOR
+  OWNER
+  ADMIN
+  ANALYST
+  VIEWER
 }
 
 enum InviteStatus {
   PENDING
   ACCEPTED
   REVOKED
+  EXPIRED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  CHURNED
+}
+
+enum AuditEntityType {
+  COMPANY_SETTINGS
+  MEMBER
+  CUSTOMER
+  METRIC_SNAPSHOT
+  INVITE
+  REPORT
+  SHARE_LINK
+}
+
+enum AuditAction {
+  CREATED
+  UPDATED
+  DELETED
+  IMPORTED
+  INVITED
+  ACCEPTED
+  REVOKED
+  GENERATED
+  SHARED
+  VIEWED
 }
 
 model User {
-  id             String               @id @default(cuid())
-  email          String               @unique
+  id             String   @id @default(cuid())
+  email          String   @unique
   passwordHash   String
   name           String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
-  memberships    CompanyMembership[]
-  auditLogs      AuditLog[]
-  sentInvites    InvestorInvite[]     @relation("InviteSender")
+  isActive       Boolean  @default(true)
+  // Null until the user proves control of the address. Phase 3 enforces it on
+  // the first sign-in; the column exists so enabling it is not a migration.
+  emailVerifiedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships CompanyMembership[]
+  sentInvites Invite[]            @relation("InviteSender")
+  auditLogs   AuditLog[]
+  shareLinks  ShareLink[]
+  sessions    Session[]
 }
 
+// A tenant. Not an "organisation" in the enterprise sense: one account can hold
+// several of these, and a membership points at exactly one.
 model Company {
-  id           String               @id @default(cuid())
-  name         String
-  orgId        String               @default(cuid())
-  persona      String?              // seed-only: which fake persona this demo company represents
-  runwayGreenMonths  Int            @default(12) // >= this many months = green zone
-  runwayYellowMonths Int            @default(6)  // >= this many months = yellow zone, below = red
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id        String @id @default(cuid())
+  name      String
+  slug      String @unique
+  currency  String @default("USD") @db.VarChar(3)
+  // Runway thresholds in whole months. red < yellow < green. The migration adds
+  // a CHECK constraint; the Zod DTO is the friendly second line of defence.
+  runwayGreenMonths  Int @default(12)
+  runwayYellowMonths Int @default(6)
 
-  memberships  CompanyMembership[]
-  snapshots    MetricSnapshot[]
-  cohorts      CohortEntry[]
-  invites      InvestorInvite[]
-  auditLogs    AuditLog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships   CompanyMembership[]
+  invites       Invite[]
+  snapshots     MetricSnapshot[]
+  customers     Customer[]
+  customerMonths CustomerMonthlyValue[]
+  auditLogs     AuditLog[]
+  shareLinks    ShareLink[]
 }
 
 model CompanyMembership {
-  id         String         @id @default(cuid())
-  userId     String
-  companyId  String
-  role       MembershipRole
-  createdAt  DateTime       @default(now())
+  id        String         @id @default(cuid())
+  userId    String
+  companyId String
+  role      MembershipRole
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
-  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company    Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([userId, companyId])
   @@index([companyId])
 }
 
-model InvestorInvite {
-  id          String        @id @default(cuid())
+// Inviting a teammate is granting a role, not inviting an "investor", so the
+// model is named for the action. The token is what the invitee redeems; it is
+// stored unhashed only because it is emailed rather than presented by an
+// authenticated party. Nothing sensitive rides on it and it expires.
+model Invite {
+  id          String       @id @default(cuid())
   companyId   String
   email       String
-  status      InviteStatus  @default(PENDING)
+  role        MembershipRole
+  status      InviteStatus @default(PENDING)
+  token       String       @unique
   invitedById String
-  createdAt   DateTime      @default(now())
+  expiresAt   DateTime
+  createdAt   DateTime     @default(now())
   respondedAt DateTime?
 
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  invitedBy   User          @relation("InviteSender", fields: [invitedById], references: [id])
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation("InviteSender", fields: [invitedById], references: [id])
 
   @@index([companyId])
+  @@index([email])
 }
 
-// One row per company per month. Decimal types throughout for currency precision.
+// One row per company per month, in the company's reporting currency. Decimal
+// throughout; integers are only for counts. `month` is always the first instant
+// of the month (enforced by a CHECK constraint) so ordering and comparison are
+// plain equality.
 model MetricSnapshot {
   id               String   @id @default(cuid())
   companyId        String
-  month            DateTime // normalized to first-of-month
-  mrr              Decimal  @db.Decimal(14, 2)
-  newMrr           Decimal  @db.Decimal(14, 2) @default(0)
-  expansionMrr     Decimal  @db.Decimal(14, 2) @default(0)
-  contractionMrr   Decimal  @db.Decimal(14, 2) @default(0)
-  churnedMrr       Decimal  @db.Decimal(14, 2) @default(0)
+  month            DateTime
+  mrr              Decimal  @db.Decimal(16, 2)
+  newMrr           Decimal  @db.Decimal(16, 2) @default(0)
+  expansionMrr     Decimal  @db.Decimal(16, 2) @default(0)
+  contractionMrr   Decimal  @db.Decimal(16, 2) @default(0)
+  churnedMrr       Decimal  @db.Decimal(16, 2) @default(0)
   newCustomers     Int      @default(0)
   churnedCustomers Int      @default(0)
   totalCustomers   Int      @default(0)
-  burnRate         Decimal  @db.Decimal(14, 2)
-  cash             Decimal  @db.Decimal(14, 2)
+  burnRate         Decimal  @db.Decimal(16, 2)
+  cash             Decimal  @db.Decimal(16, 2)
   notes            String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  company          Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@unique([companyId, month])
   @@index([companyId, month])
 }
 
-// Fake/seed data only in v1 — real per-customer ingestion is v2 scope.
-model CohortEntry {
-  id           String   @id @default(cuid())
-  companyId    String
-  customerId   String
-  signupMonth  DateTime
-  status       String   // active | churned
-  mrrByMonth   Json     // { "0": 120.00, "1": 118.00, ... } keyed by months-since-signup
-  createdAt    DateTime @default(now())
+// A paying customer, and what it was worth each month. The previous model kept
+// a JSON blob of months on the customer, which could not be summed, indexed or
+// constrained in SQL. One row per customer per month is queryable, aggregatable
+// and safe to upsert from a connector.
+//
+// companyId is duplicated on CustomerMonthlyValue deliberately: a company-month
+// rollup then needs no join, and a composite foreign key pins the row to its
+// own customer's tenant so the two can never disagree.
+model Customer {
+  id         String         @id @default(cuid())
+  companyId  String
+  // Stable identifier in the source system (Stripe id, Salesforce id, a
+  // ledger account number). Unique per company, nullable for manual entries.
+  externalId String?
+  name       String?
+  status     CustomerStatus @default(ACTIVE)
+  signupMonth DateTime
+  churnedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
 
-  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  monthlyValues CustomerMonthlyValue[]
 
+  @@unique([companyId, externalId])
+  // Target of the composite foreign key from CustomerMonthlyValue.
+  @@unique([id, companyId])
   @@index([companyId, signupMonth])
 }
 
-model AuditLog {
+model CustomerMonthlyValue {
   id         String   @id @default(cuid())
   companyId  String
+  customerId String
+  month      DateTime
+  mrr        Decimal  @db.Decimal(16, 2)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId, companyId], references: [id, companyId], onDelete: Cascade)
+
+  @@unique([customerId, month])
+  @@index([companyId, month])
+}
+
+// A public, unauthenticated read window onto one company's report. Replaces the
+// in-memory map, which lost every link on restart and could not be revoked.
+// Only the token is secret; it is random, scoped to one company, and expirable.
+model ShareLink {
+  id          String    @id @default(cuid())
+  companyId   String
+  token       String    @unique
+  createdById String
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  viewCount   Int       @default(0)
+  lastViewedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([companyId])
+}
+
+// Append-only. entityType and action are enums so the vocabulary cannot drift
+// into a typo, and the tenant is carried on the row so the audit trail
+// survives deletion of the thing it describes.
+model AuditLog {
+  id         String          @id @default(cuid())
+  companyId  String
   entityId   String
-  entityType String
-  action     String
+  entityType AuditEntityType
+  action     AuditAction
   changedBy  String
-  changedAt  DateTime @default(now())
+  changedAt  DateTime        @default(now())
   diff       Json?
 
-  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  user       User     @relation(fields: [changedBy], references: [id])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [changedBy], references: [id])
 
   @@index([companyId, changedAt])
+}
+
+// Refresh tokens, hashed. familyId groups a rotation chain so that replaying a
+// already-rotated token can revoke the whole family instead of silently
+// issuing a second valid chain. Consumed by Phase 3.
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  replacedById String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
 }

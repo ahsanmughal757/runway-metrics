@@ -72,36 +72,63 @@ describe('demo data determinism', () => {
       const b = generateCohorts('steady', 12, 12);
 
       expect(JSON.stringify(a)).toBe(JSON.stringify(b));
-      expect(a.map((c) => c.customerId)).toEqual(b.map((c) => c.customerId));
+      expect(a.map((c) => c.externalId)).toEqual(b.map((c) => c.externalId));
     });
 
     it('never emits duplicate customer ids within a run', () => {
       for (const key of allPersonaKeys()) {
-        const ids = generateCohorts(key, 12, 12).map((c) => c.customerId);
+        const ids = generateCohorts(key, 12, 12).map((c) => c.externalId);
         expect(new Set(ids).size).toBe(ids.length);
       }
     });
 
     it('marks a cohort churned exactly when its series reaches zero', () => {
       for (const entry of generateCohorts('steady', 12, 12)) {
-        const values = Object.entries(entry.mrrByMonth).map(([k, v]) => [Number(k), v] as const);
-        const reachedZero = values.some(([, v]) => v === 0);
+        const values = entry.values;
+        const zeroIndex = values.findIndex((v) => v.mrr === 0);
 
-        if (reachedZero) {
+        if (zeroIndex >= 0) {
           expect(entry.status).toBe('churned');
-          // Once churned, nothing is tracked afterwards.
-          const zeroIndex = values.findIndex(([, v]) => v === 0);
+          // The zero row is the last one: nothing is tracked after churn.
           expect(values.length - 1).toBe(zeroIndex);
+          // And the churn date agrees with the status, which the database CHECK
+          // constraint now enforces.
+          expect(entry.churnedAt).toEqual(values[zeroIndex].month);
         } else {
           expect(entry.status).toBe('active');
-          expect(values.every(([, v]) => v > 0)).toBe(true);
+          expect(entry.churnedAt).toBeNull();
+          expect(values.every((v) => v.mrr > 0)).toBe(true);
         }
       }
     });
 
     it('always records month 0 revenue', () => {
       for (const entry of generateCohorts('hypergrowth', 6, 6)) {
-        expect(entry.mrrByMonth['0']).toBeGreaterThan(0);
+        expect(entry.values[0].mrr).toBeGreaterThan(0);
+      }
+    });
+
+    it('emits consecutive months starting at the signup month', () => {
+      // The database now refuses any month that is not the first of a month, and
+      // the retention maths assumes offset t is exactly t months after signup.
+      for (const entry of generateCohorts('steady', 6, 6)) {
+        entry.values.forEach((value, index) => {
+          expect(value.month.getUTCDate()).toBe(1);
+          const expected =
+            new Date(Date.UTC(entry.signupMonth.getUTCFullYear(), entry.signupMonth.getUTCMonth() + index, 1));
+          expect(value.month.toISOString()).toBe(expected.toISOString());
+        });
+      }
+    });
+
+    it('never emits a duplicate (customer, month) pair', () => {
+      // CustomerMonthlyValue has a unique constraint on exactly this pair, so a
+      // generator that produced one would make the seed fail.
+      for (const key of allPersonaKeys()) {
+        for (const entry of generateCohorts(key, 12, 12)) {
+          const months = entry.values.map((v) => v.month.toISOString());
+          expect(new Set(months).size).toBe(months.length);
+        }
       }
     });
   });

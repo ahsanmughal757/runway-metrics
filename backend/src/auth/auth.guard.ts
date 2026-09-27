@@ -5,7 +5,8 @@ import { BypassAuthGuard } from './bypass-auth.guard';
 
 /**
  * Single guard used across all protected controllers. Delegates to
- * BypassAuthGuard in demo mode, otherwise runs real JWT verification.
+ * BypassAuthGuard in demo mode, otherwise runs real JWT verification plus
+ * membership resolution.
  * This keeps every controller's @UseGuards(AuthGuard) identical regardless
  * of mode — only this one file branches on env.BYPASS_AUTH.
  */

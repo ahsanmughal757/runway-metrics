@@ -1,17 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Pagination, Tab, Tabs } from '@heroui/react';
-import { Activity as ActivityIcon, FileText, TrendingUp, UserPlus, Upload as UploadIcon } from 'lucide-react';
+import { Activity as ActivityIcon } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
-
-interface ActivityItem {
-  id: string;
-  entityType: string;
-  action: string;
-  changedBy: string;
-  changedAt: string;
-}
+import { ACTION_VERBS, ENTITY_ICONS, ENTITY_LABELS, type ActivityItem, type AuditEntityType } from '../lib/audit';
 
 interface ActivityPage {
   items: ActivityItem[];
@@ -20,19 +13,13 @@ interface ActivityPage {
   pageSize: number;
 }
 
-const FILTERS = [
+const FILTERS: { key: string; label: string; entityType: AuditEntityType | undefined }[] = [
   { key: 'all', label: 'All', entityType: undefined },
-  { key: 'snapshot', label: 'Snapshot', entityType: 'MetricSnapshot' },
-  { key: 'invite', label: 'Invite', entityType: 'InvestorInvite' },
-  { key: 'report', label: 'Report', entityType: 'Report' },
+  { key: 'snapshot', label: 'Snapshot', entityType: 'METRIC_SNAPSHOT' },
+  { key: 'customer', label: 'Customer', entityType: 'CUSTOMER' },
+  { key: 'invite', label: 'Invite', entityType: 'INVITE' },
+  { key: 'member', label: 'Team', entityType: 'MEMBER' },
 ];
-
-const iconFor: Record<string, typeof ActivityIcon> = {
-  MetricSnapshot: TrendingUp,
-  InvestorInvite: UserPlus,
-  Report: FileText,
-  Csv: UploadIcon,
-};
 
 function timeAgo(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -52,7 +39,7 @@ export function Activity() {
   const [page, setPage] = useState(1);
 
   const load = useCallback(
-    (entityType: string | undefined, p: number) => {
+    (entityType: AuditEntityType | undefined, p: number) => {
       if (!activeCompanyId) return;
       setError(null);
       const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) });
@@ -121,7 +108,7 @@ export function Activity() {
             {data && data.items.length > 0 && (
               <div className="divide-y divide-runway-border/40">
                 {data.items.map((item) => {
-                  const Icon = iconFor[item.entityType] ?? ActivityIcon;
+                  const Icon = ENTITY_ICONS[item.entityType] ?? ActivityIcon;
                   return (
                     <div key={item.id} className="flex items-start gap-3 py-3 px-2">
                       <span className="w-8 h-8 rounded-lg bg-runway-accent/10 border border-runway-accent/20 flex items-center justify-center shrink-0 mt-0.5">
@@ -130,7 +117,9 @@ export function Activity() {
                       <div className="min-w-0 flex-1">
                         <p className="text-xs text-runway-text leading-relaxed">
                           <span className="font-semibold">{item.changedBy}</span>{' '}
-                          <span className="text-runway-muted">{item.action}</span>
+                          <span className="text-runway-muted">
+                            {ACTION_VERBS[item.action] ?? item.action} {ENTITY_LABELS[item.entityType] ?? item.entityType}
+                          </span>
                         </p>
                         <p className="text-[11px] text-runway-muted mt-0.5">
                           {new Date(item.changedAt).toLocaleString('en-US', {
@@ -141,8 +130,6 @@ export function Activity() {
                           })}
                           {' · '}
                           {timeAgo(item.changedAt)}
-                          {' · '}
-                          <span className="text-runway-muted/80">{item.entityType}</span>
                         </p>
                       </div>
                     </div>
