@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
-import { api } from './api';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { api, endLocalSession, SIGNED_OUT_EVENT } from './api';
 import type { Role } from './permissions';
 
 interface SessionUser {
@@ -27,7 +27,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (input: { email: string; password: string; name?: string; companyName: string }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -70,21 +70,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [acceptSession],
   );
 
-  const logout = useCallback(() => {
-    // Client-side only. There is deliberately no `/auth/logout` endpoint yet:
-    // revoking a token server-side means a session table, and until that exists
-    // a "logout" that only clears the browser would be a promise the server
-    // does not keep. The token stays valid until it expires, so this is a
-    // convenience for the person at the keyboard, not a security boundary.
-    localStorage.removeItem('runway_token');
-    localStorage.removeItem('runway_active_company_id');
-    setIsAuthenticated(false);
+  const logout = useCallback(async () => {
+    // The server first. The refresh token is a cookie the page cannot see, so
+    // clearing localStorage would leave a working credential sitting in the
+    // browser's cookie jar - "log out" would close the app without ending the
+    // session, and anyone who reopened it would be signed straight back in.
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Already signed out, or the network is gone. Either way the local
+      // session is cleared below; there is nothing useful to report here.
+    } finally {
+      endLocalSession();
+      setIsAuthenticated(false);
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({ isAuthenticated, login, register, logout }),
     [isAuthenticated, login, register, logout],
   );
+
+  // A refresh that fails means the session is genuinely over, wherever it is
+  // noticed. Without this the UI keeps rendering as signed in with a token that
+  // can no longer be used, and only the next manual navigation would reveal it.
+  useEffect(() => {
+    const onSignedOut = () => setIsAuthenticated(false);
+    window.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
+    return () => window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
+  }, []);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

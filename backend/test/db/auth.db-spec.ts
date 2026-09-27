@@ -35,7 +35,7 @@ describe('auth and tenancy', () => {
     it('creates the user, the company, the owner membership and an audit row together', async () => {
       const email = uniqueEmail('reg');
       const res = await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email, password: PASSWORD, name: 'Ada', companyName: 'Ada Robotics' })
         .expect(201);
 
@@ -64,7 +64,7 @@ describe('auth and tenancy', () => {
 
     it('stores the password hashed, never in the clear', async () => {
       const email = uniqueEmail('reg');
-      await request(server()).post('/auth/register').send({ email, password: PASSWORD, companyName: 'Acme' }).expect(201);
+      await request(server()).post('/api/auth/register').send({ email, password: PASSWORD, companyName: 'Acme' }).expect(201);
       const user = await prisma.user.findUniqueOrThrow({ where: { email } });
       expect(user.passwordHash).not.toBe(PASSWORD);
       expect(user.passwordHash.startsWith('$2')).toBe(true);
@@ -72,10 +72,10 @@ describe('auth and tenancy', () => {
 
     it('normalises the email so the same person cannot register twice', async () => {
       const email = uniqueEmail('Dup');
-      await request(server()).post('/auth/register').send({ email, password: PASSWORD, companyName: 'Acme' }).expect(201);
+      await request(server()).post('/api/auth/register').send({ email, password: PASSWORD, companyName: 'Acme' }).expect(201);
       // Same address, different capitalisation: one person, one account.
       await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: email.toUpperCase(), password: PASSWORD, companyName: 'Acme Two' })
         .expect(409);
       expect(await prisma.user.count()).toBe(1);
@@ -90,7 +90,7 @@ describe('auth and tenancy', () => {
       const raw = `  ${uniqueEmail().toUpperCase()}  `;
 
       const res = await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: raw, password: PASSWORD, companyName: 'Acme' })
         .expect(201);
 
@@ -101,7 +101,7 @@ describe('auth and tenancy', () => {
 
       // And it is the same identity, not a second one.
       await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: raw, password: PASSWORD, companyName: 'Acme Two' })
         .expect(409);
       expect(await prisma.user.count({ where: { email: normalized } })).toBe(1);
@@ -109,21 +109,21 @@ describe('auth and tenancy', () => {
 
     it('refuses a company name that is too short to be a name', async () => {
       await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: uniqueEmail(), password: PASSWORD, companyName: 'A' })
         .expect(400);
     });
 
     it('rejects a weak password', async () => {
       await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: uniqueEmail(), password: 'short', companyName: 'Acme' })
         .expect(400);
     });
 
     it('rejects unknown fields rather than silently ignoring them', async () => {
       await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: uniqueEmail(), password: PASSWORD, companyName: 'Acme', isAdmin: true })
         .expect(400);
     });
@@ -131,7 +131,7 @@ describe('auth and tenancy', () => {
     it('leaves no user behind when the request is rejected', async () => {
       const before = await prisma.user.count();
       await request(server())
-        .post('/auth/register')
+        .post('/api/auth/register')
         .send({ email: uniqueEmail(), password: PASSWORD, companyName: '' })
         .expect(400);
       // A rejected signup must not create a user with no way to reach a company.
@@ -143,7 +143,7 @@ describe('auth and tenancy', () => {
     it('issues a token that identifies the user but carries no role', async () => {
       const owner = await registerOwner(app);
       const login = await request(server())
-        .post('/auth/login')
+        .post('/api/auth/login')
         .send({ email: owner.email, password: PASSWORD })
         .expect(200);
 
@@ -162,7 +162,7 @@ describe('auth and tenancy', () => {
     it('accepts a differently-cased email', async () => {
       const owner = await registerOwner(app);
       await request(server())
-        .post('/auth/login')
+        .post('/api/auth/login')
         .send({ email: owner.email.toUpperCase(), password: PASSWORD })
         .expect(200);
     });
@@ -170,11 +170,11 @@ describe('auth and tenancy', () => {
     it('gives the same message for an unknown user and a wrong password', async () => {
       const owner = await registerOwner(app);
       const unknown = await request(server())
-        .post('/auth/login')
+        .post('/api/auth/login')
         .send({ email: uniqueEmail('nobody'), password: PASSWORD })
         .expect(401);
       const wrong = await request(server())
-        .post('/auth/login')
+        .post('/api/auth/login')
         .send({ email: owner.email, password: 'not-the-password-999' })
         .expect(401);
       // If these differ, the endpoint is a user-enumeration oracle.
@@ -184,7 +184,7 @@ describe('auth and tenancy', () => {
     it('rejects an inactive account', async () => {
       const owner = await registerOwner(app);
       await prisma.user.update({ where: { id: owner.userId }, data: { isActive: false } });
-      await request(server()).post('/auth/login').send({ email: owner.email, password: PASSWORD }).expect(401);
+      await request(server()).post('/api/auth/login').send({ email: owner.email, password: PASSWORD }).expect(401);
     });
   });
 
@@ -194,7 +194,7 @@ describe('auth and tenancy', () => {
       // No X-Company-Id: the switcher has to work before a company is chosen,
       // so the list endpoint must not demand one.
       const res = await request(server())
-        .get('/companies')
+        .get('/api/companies')
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(200);
       expect(res.body).toHaveLength(1);
@@ -208,7 +208,7 @@ describe('auth and tenancy', () => {
       // default deliberately: it is a convenience, not an authorisation, and
       // the header is what actually selects the tenant.
       const res = await request(server())
-        .get('/companies/settings')
+        .get('/api/companies/settings')
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(200);
       expect(res.body.id).toBe(owner.companyId);
@@ -222,7 +222,7 @@ describe('auth and tenancy', () => {
       });
 
       const res = await request(server())
-        .get('/companies/settings')
+        .get('/api/companies/settings')
         .set('Authorization', `Bearer ${first.accessToken}`)
         .expect(200);
       expect(res.body.id).toBe(first.companyId);
@@ -233,7 +233,7 @@ describe('auth and tenancy', () => {
       const theirs = await registerOwner(app, uniqueEmail('theirs'), 'Theirs');
 
       await request(server())
-        .get('/companies/settings')
+        .get('/api/companies/settings')
         .set('Authorization', `Bearer ${mine.accessToken}`)
         .set('X-Company-Id', theirs.companyId)
         .expect(403);
@@ -244,7 +244,7 @@ describe('auth and tenancy', () => {
       // The client is free to claim whatever it likes in a header; only the
       // database decides.
       const me = await request(server())
-        .get('/auth/me')
+        .get('/api/auth/me')
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .set('X-Company-Id', owner.companyId)
         .set('X-Role', 'OWNER')
@@ -256,7 +256,7 @@ describe('auth and tenancy', () => {
     it('refuses an unknown company id rather than defaulting to one', async () => {
       const owner = await registerOwner(app);
       await request(server())
-        .get('/companies/settings')
+        .get('/api/companies/settings')
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .set('X-Company-Id', 'no-such-company')
         .expect(403);
@@ -272,14 +272,14 @@ describe('auth and tenancy', () => {
       });
 
       const asB = await request(server())
-        .get('/companies/settings')
+        .get('/api/companies/settings')
         .set('Authorization', `Bearer ${a.accessToken}`)
         .set('X-Company-Id', b.companyId)
         .expect(200);
       expect(asB.body.name).toBe('Beta');
 
       const asA = await request(server())
-        .get('/companies/settings')
+        .get('/api/companies/settings')
         .set('Authorization', `Bearer ${a.accessToken}`)
         .set('X-Company-Id', a.companyId)
         .expect(200);
@@ -303,7 +303,7 @@ describe('auth and tenancy', () => {
     it('lets an owner update settings', async () => {
       const u = await asRole('OWNER');
       await request(server())
-        .put('/companies/settings')
+        .put('/api/companies/settings')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send(PUT_SETTINGS)
@@ -313,7 +313,7 @@ describe('auth and tenancy', () => {
     it('lets an admin update settings, because that is part of the job', async () => {
       const u = await asRole('ADMIN');
       await request(server())
-        .put('/companies/settings')
+        .put('/api/companies/settings')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send(PUT_SETTINGS)
@@ -324,7 +324,7 @@ describe('auth and tenancy', () => {
       for (const role of ['ANALYST', 'VIEWER'] as const) {
         const u = await asRole(role);
         await request(server())
-          .put('/companies/settings')
+          .put('/api/companies/settings')
           .set('Authorization', `Bearer ${u.accessToken}`)
           .set('X-Company-Id', u.companyId)
           .send(PUT_SETTINGS)
@@ -335,7 +335,7 @@ describe('auth and tenancy', () => {
     it('names the missing permission in the refusal', async () => {
       const u = await asRole('VIEWER');
       const res = await request(server())
-        .put('/companies/settings')
+        .put('/api/companies/settings')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send(PUT_SETTINGS)
@@ -346,7 +346,7 @@ describe('auth and tenancy', () => {
     it('refuses inviting members to a viewer', async () => {
       const u = await asRole('VIEWER');
       await request(server())
-        .post('/companies/invites')
+        .post('/api/companies/invites')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send({ email: uniqueEmail('x'), role: 'VIEWER' })
@@ -369,7 +369,7 @@ describe('auth and tenancy', () => {
       });
 
       const inviteRes = await request(server())
-        .post('/companies/invites')
+        .post('/api/companies/invites')
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .set('X-Company-Id', owner.companyId)
         .send({ email: uniqueEmail('new'), role: 'VIEWER' });
@@ -382,7 +382,7 @@ describe('auth and tenancy', () => {
         where: { companyId: owner.companyId, role: 'OWNER' },
       });
       const res = await request(server())
-        .delete(`/companies/members/${ownerMembership.id}`)
+        .delete(`/api/companies/members/${ownerMembership.id}`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .set('X-Company-Id', owner.companyId)
         .expect(409);
@@ -390,7 +390,7 @@ describe('auth and tenancy', () => {
 
       // Promoting the admin to OWNER is refused: nobody grants their own rank.
       await request(server())
-        .patch(`/companies/members/${adminMembership.id}/role`)
+        .patch(`/api/companies/members/${adminMembership.id}/role`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .set('X-Company-Id', owner.companyId)
         .send({ role: 'OWNER' })
@@ -400,7 +400,7 @@ describe('auth and tenancy', () => {
     it('refuses role changes to a viewer', async () => {
       const viewer = await asRole('VIEWER');
       await request(server())
-        .patch(`/companies/members/${viewer.userId}/role`)
+        .patch(`/api/companies/members/${viewer.userId}/role`)
         .set('Authorization', `Bearer ${viewer.accessToken}`)
         .set('X-Company-Id', viewer.companyId)
         .send({ role: 'OWNER' })
@@ -431,7 +431,7 @@ describe('auth and tenancy', () => {
 
       const analyst = await asRole('ANALYST');
       const written = await request(server())
-        .post('/metrics/snapshot')
+        .post('/api/metrics/snapshot')
         .set('Authorization', `Bearer ${analyst.accessToken}`)
         .set('X-Company-Id', analyst.companyId)
         .send(snapshot(thisMonth))
@@ -441,7 +441,7 @@ describe('auth and tenancy', () => {
 
       const viewer = await asRole('VIEWER');
       await request(server())
-        .post('/metrics/snapshot')
+        .post('/api/metrics/snapshot')
         .set('Authorization', `Bearer ${viewer.accessToken}`)
         .set('X-Company-Id', viewer.companyId)
         .send(snapshot(lastYear))
@@ -452,10 +452,10 @@ describe('auth and tenancy', () => {
 
     it('requires a valid token', async () => {
       const u = await registerOwner(app);
-      await request(server()).get('/companies').set('Authorization', 'Bearer not-a-jwt').expect(401);
-      await request(server()).get('/companies').expect(401);
+      await request(server()).get('/api/companies').set('Authorization', 'Bearer not-a-jwt').expect(401);
+      await request(server()).get('/api/companies').expect(401);
       await request(server())
-        .get('/companies')
+        .get('/api/companies')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .expect(200);
@@ -466,14 +466,14 @@ describe('auth and tenancy', () => {
     it('records a settings update with the actor and a diff', async () => {
       const u = await registerOwner(app);
       await request(server())
-        .put('/companies/settings')
+        .put('/api/companies/settings')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send({ name: 'Before', runwayGreenMonths: 12, runwayYellowMonths: 6 })
         .expect(200);
 
       await request(server())
-        .put('/companies/settings')
+        .put('/api/companies/settings')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send({ name: 'After', runwayGreenMonths: 18, runwayYellowMonths: 6 })
@@ -505,7 +505,7 @@ describe('auth and tenancy', () => {
       // guaranteed to fail. If the audit insert were not in the same
       // transaction, an "UPDATED" row would survive the rejection.
       await request(server())
-        .put('/companies/settings')
+        .put('/api/companies/settings')
         .set('Authorization', `Bearer ${u.accessToken}`)
         .set('X-Company-Id', u.companyId)
         .send({ name: 'Nope', runwayGreenMonths: 3, runwayYellowMonths: 24 })

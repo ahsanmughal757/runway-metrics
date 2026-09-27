@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import type { Server } from 'http';
 import request from 'supertest';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app.module';
 import { requestIdMiddleware } from '../src/common/logging/request-id.middleware';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
@@ -30,6 +31,10 @@ describe('Runway API (e2e)', () => {
     app = moduleRef.createNestApplication({ bufferLogs: true });
     app.use(requestIdMiddleware);
     app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+    // Mirrors main.ts. Without it the refresh cookie is invisible here, and a
+    // session feature tested only against the DB suite would never be exercised
+    // through the real middleware stack.
+    app.use(cookieParser());
     app.enableCors({
       origin: env.CORS_ORIGINS,
       credentials: true,

@@ -24,10 +24,9 @@ export function TopBar() {
     applyTheme(next, true);
   }
 
-  function handleLogout() {
-    auth.logout();
-    navigate('/login');
-  }
+function handleLogout() {
+  void auth.logout();
+}
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3 bg-runway-bg/60 backdrop-blur-xl border-b border-runway-border/60">

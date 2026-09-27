@@ -37,6 +37,9 @@ const VALID_PROD = {
   JWT_SECRET: 'prod-jwt-secret-value-long-enough-1234',
   CREDENTIALS_MASTER_KEY: 'prod-credentials-master-key-123456',
   CORS_ORIGINS: 'https://runway.example.com',
+  // The refresh cookie is a credential; over http it would cross the network in
+  // clear. Production is required to set this, so a valid config includes it.
+  COOKIE_SECURE: 'true',
 } as const;
 
 const prod = (over: Record<string, string | undefined> = {}) => loadEnvWith({ ...VALID_PROD, ...over });
@@ -61,6 +64,8 @@ describe('env configuration', () => {
 
     it.each<[string, Record<string, string | undefined>, string]>([
       ['BYPASS_AUTH is on', { BYPASS_AUTH: 'true' }, 'BYPASS_AUTH'],
+      ['the refresh cookie is not marked secure', { COOKIE_SECURE: 'false' }, 'COOKIE_SECURE'],
+      ['the refresh cookie is not marked secure', { COOKIE_SECURE: undefined }, 'COOKIE_SECURE'],
       ['no database URL', { DATABASE_URL: undefined }, 'DATABASE_URL'],
       ['the database is disabled', { ENABLE_DATABASE: 'false' }, 'ENABLE_DATABASE'],
       ['no credentials key', { CREDENTIALS_MASTER_KEY: undefined }, 'CREDENTIALS_MASTER_KEY'],

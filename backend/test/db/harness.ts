@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../../src/app.module';
 
 /**
@@ -42,8 +43,18 @@ export async function makeApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
   // Mirrors main.ts. Without the same ValidationPipe these suites would accept
-  // payloads that production rejects, and pass anyway.
+  // payloads that production rejects, and pass anyway. cookieParser is here for
+  // the same reason: the refresh token arrives as a cookie, so a session test
+  // without this middleware would be testing a request the server never sees.
+  app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  // The same global prefix, including the same exclusions. Without this the
+  // suites exercised `/auth/refresh` while the server only ever serves
+  // `/api/auth/refresh` - and the refresh cookie's `Path=/api/auth` did not even
+  // match the URLs being called, so a routing or cookie-scoping mistake would
+  // have passed here and failed in production. The exclusions are the health
+  // checks, which stay at the root for orchestrators to probe.
+  app.setGlobalPrefix('api', { exclude: ['health', 'health/ready'] });
   await app.init();
   return app;
 }
@@ -76,7 +87,7 @@ export async function registerOwner(
   companyName = 'Test Co',
 ): Promise<Registered> {
   const res = await request(app.getHttpServer())
-    .post('/auth/register')
+    .post('/api/auth/register')
     .send({ email, password: PASSWORD, name: 'Test User', companyName })
     .expect(201);
 

@@ -152,6 +152,15 @@ it used to reject.
   shape as import) — not just the polished PDF.
 - **Login / Signup screens**, wired to the auth endpoints that existed in the
   backend since v1 but had no frontend.
+- **Sessions that actually end** — the refresh token is an opaque random value
+  in an httpOnly cookie scoped to `/api/auth`, and only its SHA-256 hash is
+  stored, so a database dump does not hand over working sessions. Every refresh
+  rotates it, and presenting one that was already spent revokes the entire
+  rotation family rather than quietly issuing a second token. Logout revokes
+  server-side; the **Devices** page lists live sessions — marking the one you
+  are currently on — and revokes any of them. The access token stays a
+  15-minute JWT in `localStorage` — a stolen one dies on its own, and the
+  refresh cookie behind it is what the database protects.
 - **Route-level code splitting** via `React.lazy` — each page ships as its
   own chunk.
 

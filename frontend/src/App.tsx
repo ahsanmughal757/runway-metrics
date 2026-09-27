@@ -16,6 +16,7 @@ const Scenarios = lazy(() => import('./pages/Scenarios').then((m) => ({ default:
 const Integrations = lazy(() => import('./pages/Integrations').then((m) => ({ default: m.Integrations })));
 const Billing = lazy(() => import('./pages/Billing').then((m) => ({ default: m.Billing })));
 const ApiKeys = lazy(() => import('./pages/ApiKeys').then((m) => ({ default: m.ApiKeys })));
+const Sessions = lazy(() => import('./pages/Sessions').then((m) => ({ default: m.Sessions })));
 const Team = lazy(() => import('./pages/Team').then((m) => ({ default: m.Team })));
 const Activity = lazy(() => import('./pages/Activity').then((m) => ({ default: m.Activity })));
 const Login = lazy(() => import('./pages/Login').then((m) => ({ default: m.Login })));
@@ -77,6 +78,7 @@ export default function App() {
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/api-keys" element={<ApiKeys />} />
+  <Route path="/devices" element={<Sessions />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Suspense>

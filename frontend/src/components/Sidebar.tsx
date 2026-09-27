@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, GitCompare, Command, Rocket,
-  SlidersHorizontal, UserCog, Activity, Plug, CreditCard, KeyRound,
+  SlidersHorizontal, UserCog, Activity, Plug, CreditCard, KeyRound, MonitorSmartphone,
 } from 'lucide-react';
 
 const links = [
@@ -22,6 +22,7 @@ const secondaryLinks = [
   { to: '/integrations', label: 'Integrations', icon: Plug },
   { to: '/billing', label: 'Billing', icon: CreditCard },
   { to: '/api-keys', label: 'API Keys', icon: KeyRound },
+  { to: '/devices', label: 'Devices', icon: MonitorSmartphone },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

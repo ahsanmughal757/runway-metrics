@@ -6,6 +6,65 @@ what the client *sees* belongs here, whether or not it is a bug fix.
 
 ## Unreleased
 
+### Added: rotating refresh sessions, and a logout that really logs out
+
+**Was:** `POST /auth/login` returned a 15-minute access token and nothing else.
+`frontend/src/lib/api.ts` already called `POST /auth/refresh`, which did not
+exist, so that call 404'd, the retry failed, and every user was silently signed
+out after 15 minutes. The frontend's "log out" button cleared `localStorage`
+only: the `logout()` comment said outright that it was "not a security
+boundary", and it was not.
+
+**Now:**
+
+- `POST /auth/register` and `POST /auth/login` also set an httpOnly cookie
+  (`runway_rt` by default, `Path=/api/auth`, `SameSite=Lax`, `Secure` in
+  production). The refresh token is not in the JSON body and is not reachable
+  from JavaScript.
+- Only the SHA-256 hash is persisted, in the `Session.tokenHash` column that
+  the baseline migration already had.
+- `POST /auth/refresh` rotates: the presented token is revoked and replaced
+  with a new one in the same `familyId`, sharing the original `expiresAt` so a
+  30-day login cannot slide into forever.
+- Reusing a spent token revokes the **whole family** and returns 401. This is
+  the property worth arguing about: a stolen cookie that the thief uses first
+  locks the real user out, and vice versa. The alternative — silently issuing a
+  second token — means a stolen cookie is undetectable until someone notices.
+  Failing closed is the point.
+- `POST /auth/logout` revokes the family server-side and clears the cookie with
+  matching attributes. An already-issued access token keeps working until it
+  expires; revoking a stateless JWT is not something this schema can do.
+- `GET /auth/sessions` lists live sessions (userAgent, ip, createdAt,
+  lastUsedAt, expiresAt) and `DELETE /auth/sessions/:id` revokes one. Both
+  require a database; in `BYPASS_AUTH` demo mode they return the same
+  `ENABLE_DATABASE` conflict the other credential routes do, and the **Devices**
+  page says so rather than showing an empty list.
+- Every row carries `isCurrent`, resolved by matching the request's refresh
+  cookie against `Session.familyId`. Without it the list cannot say which entry
+  is the device you are reading it on, and revoking the wrong row signs *you*
+  out — a page about account security that breaks your session on a misclick
+  teaches people to distrust it. It follows the cookie, not the access token:
+  two devices holding the same access token are told apart correctly.
+- A refresh for a **deactivated** account revokes every session belonging to
+  that user, not only the family that presented the token.
+
+**Affects:** every `ENABLE_DATABASE=true` deployment needs
+`COOKIE_SECURE=true` in production — `env.ts` refuses to start without it.
+
+**Watch for:**
+
+- `ip` and `userAgent` are **recorded, not enforced**. An IP that changes is
+  normal on mobile, and binding sessions to one would sign people out on
+  cellular. They exist for the device list to show.
+- Concurrent refreshes are a real hazard, not a theoretical one: each refresh
+  spends its token, so a client that fires four parallel refreshes after four
+  parallel 401s would trip reuse detection and revoke its own family. The
+  frontend therefore holds a single in-flight refresh promise
+  (`frontend/src/lib/api.ts`) and shares it across all waiters.
+- The client no longer attempts a refresh for 401s from `/auth/login`,
+  `/auth/register`, `/auth/refresh` or `/auth/logout`, or when there is no token
+  to refresh. A wrong password must not mint a token.
+
 ### Changed: email addresses are trimmed at the request edge, not rejected
 
 **Was:** a value padded with whitespace was refused with a bare
@@ -38,3 +97,21 @@ Prisma `P2010` / PostgreSQL `42601` reported as an opaque `DATABASE_ERROR`.
 Fixed, and covered by `backend/test/db/cohorts.db-spec.ts`. This is the reason
 `pnpm test:db` exists as a separate suite — see the Tests section of the
 README.
+
+### Changed: the database suites now call the URLs production serves
+
+`backend/test/db/harness.ts` mounted the app without `setGlobalPrefix`, so every
+suite called `/auth/login` and `/auth/refresh` while the server only ever
+answers on `/api/auth/login` and `/api/auth/refresh`. The routes were the same
+handlers, so the mismatch was invisible — until the refresh cookie arrived, whose
+`Path=/api/auth` never matched the URLs the tests were calling.
+
+The harness now applies the same prefix with the same `health` exclusions as
+`main.ts`, and the suites were updated to match. This closes a gap where a
+routing or cookie-scoping mistake would have passed the database suite and
+failed in production. It is worth noticing what the gap hid: the session tests
+were asserting on a cookie the browser would never have sent to those URLs.
+
+**Affects:** `test/db/*.db-spec.ts` request paths only. `/health` and
+`/health/ready` remain unprefixed, matching the exclusion in `main.ts`, because
+that is where orchestrators probe.

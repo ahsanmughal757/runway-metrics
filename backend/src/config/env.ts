@@ -87,6 +87,27 @@ const schema = z
     JWT_SECRET: secret(32, 'JWT_SECRET'),
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
 
+    /**
+     * Refresh token lifetime. Much longer than the access token on purpose: it
+     * is the thing that lets a person stay signed in without seeing a login
+     * prompt, and it is revocable, unlike the access token.
+     */
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+    /**
+     * Cookie carrying the refresh token. Scoped to the auth routes so it is not
+     * attached to ordinary API calls, which keeps a token from riding along on
+     * every request the SPA makes.
+     */
+    REFRESH_COOKIE_NAME: z.string().min(1).default('runway_rt'),
+    /**
+     * `true` in production regardless of what is set, because a refresh cookie
+     * without Secure travels in cleartext and is exactly the thing worth
+     * stealing. See the production refinement below.
+     */
+    COOKIE_SECURE: boolish(false),
+    /** Omit to scope the cookie to the exact host that set it. */
+    COOKIE_DOMAIN: z.preprocess((v) => (v === '' ? undefined : v), z.string().optional()),
+
     /** Demo mode: injects a canned Founder identity. Hard-refused in production. */
     BYPASS_AUTH: boolish(false),
 
@@ -127,6 +148,13 @@ const schema = z
     }
     if (cfg.CORS_ORIGINS.length === 0) {
       ctx.addIssue({ code: 'custom', path: ['CORS_ORIGINS'], message: 'CORS_ORIGINS must list at least one origin in production' });
+    }
+    if (!cfg.COOKIE_SECURE) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['COOKIE_SECURE'],
+        message: 'COOKIE_SECURE must be true in production: without Secure the refresh token crosses the network in cleartext',
+      });
     }
   });
 

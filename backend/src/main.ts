@@ -4,6 +4,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { env, isProduction } from './config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -48,6 +49,12 @@ async function bootstrap() {
     exposedHeaders: ['X-Request-Id'],
     maxAge: 600,
   });
+
+  // Before routing, so the refresh cookie is available to AuthController. The
+  // secret argument is deliberately not passed: these cookies are opaque random
+  // tokens, not signed payloads, and there is nothing in them to verify. A
+  // tampered cookie is simply a token that matches no session.
+  app.use(cookieParser());
 
   app.useGlobalPipes(
     new ValidationPipe({

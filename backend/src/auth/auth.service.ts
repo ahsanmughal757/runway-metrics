@@ -7,11 +7,16 @@ import { env } from '../config/env';
 import { isValidEmail, normalizeEmail } from '../common/email';
 import { slugWithSuffix } from '../common/slug';
 import { permissionsForRole } from './permissions';
+import { SessionsService, type ClientMeta } from './sessions.service';
 import type { RequestUser } from '../common/decorators/current-user.decorator';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService, private jwt: JwtService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwt: JwtService,
+    private sessions: SessionsService,
+  ) {}
 
   /**
    * Open signup: a new account creates its own company and becomes its OWNER.
@@ -111,6 +116,51 @@ export class AuthService {
       permissions: user.permissions,
       memberships: await this.membershipsFor(user.userId),
     };
+  }
+
+  /**
+   * Starts a session for a user who has just proved their identity.
+   *
+   * Called by the controller after register/login, which is where the request
+   * metadata and the response object live. Kept out of `login()` itself so the
+   * credential path does not have to know about cookies.
+   */
+  async startSession(userId: string, meta: ClientMeta) {
+    this.requireDatabase('Sessions');
+    const { token } = await this.sessions.issue(userId, meta);
+    return token;
+  }
+
+  /**
+   * Exchanges a refresh token for a fresh access token and a rotated refresh
+   * token. Both are returned; the caller decides where each one goes.
+   */
+  async refresh(rawToken: string, meta: ClientMeta) {
+    this.requireDatabase('Sessions');
+    const { token, user } = await this.sessions.rotate(rawToken, meta);
+    return {
+      accessToken: this.signAccessToken(user.id, user.email),
+      refreshToken: token,
+      user: { id: user.id, email: user.email, name: user.name },
+    };
+  }
+
+  /** Ends the session a refresh token belongs to. Quiet if it is already gone. */
+  async logout(rawToken: string | undefined): Promise<void> {
+    if (!env.ENABLE_DATABASE) return;
+    await this.sessions.revokeToken(rawToken);
+  }
+
+  async listSessions(userId: string, currentToken?: string) {
+    this.requireDatabase('Sessions');
+    const currentFamilyId = await this.sessions.familyIdForToken(currentToken);
+    return this.sessions.listForUser(userId, currentFamilyId);
+  }
+
+async revokeSession(userId: string, sessionId: string): Promise<void> {
+  this.requireDatabase('Sessions');
+  const removed = await this.sessions.revokeSession(userId, sessionId);
+    if (!removed) throw new UnauthorizedException('That session is no longer active');
   }
 
   private async membershipsFor(userId: string) {

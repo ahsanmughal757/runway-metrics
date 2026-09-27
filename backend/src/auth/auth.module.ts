@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { SessionsService } from './sessions.service';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthGuard } from './auth.guard';
 import { MembershipResolver } from './membership.resolver';
@@ -11,16 +12,17 @@ import { env } from '../config/env';
 @Module({
   imports: [
     PassportModule,
-    // Short-lived by design. Phase 3 moves the session into httpOnly cookies
-    // with a rotating refresh token; until then this TTL is the only thing
-    // bounding the blast radius of a leaked token, so it is minutes not days.
+    // Deliberately minutes, not days: the access token is the thing that travels
+    // in a header and is therefore the thing most likely to leak, and a
+    // long-lived one cannot be revoked. SessionsService exists so the *session*
+    // can be long-lived and revocable without the access token being either.
     JwtModule.register({
       secret: env.JWT_SECRET,
       signOptions: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS },
     }),
   ],
-  providers: [AuthService, JwtStrategy, AuthGuard, MembershipResolver],
+  providers: [AuthService, SessionsService, JwtStrategy, AuthGuard, MembershipResolver],
   controllers: [AuthController],
-  exports: [AuthGuard, MembershipResolver, JwtModule],
+  exports: [AuthGuard, MembershipResolver, SessionsService, JwtModule],
 })
 export class AuthModule {}
