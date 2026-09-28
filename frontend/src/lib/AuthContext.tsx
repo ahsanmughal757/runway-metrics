@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, endLocalSession, SIGNED_OUT_EVENT } from './api';
+import { clearQueryCache } from './queryClient';
 import { ACTIVE_COMPANY_KEY, TOKEN_KEY, readKey, writeKey } from './storage';
 import type { Role } from './permissions';
 
@@ -99,6 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // session is cleared below; there is nothing useful to report here.
     } finally {
       endLocalSession();
+      // Before the state updates, and unconditionally. A signed-out shell with a
+      // warm cache never makes a request, so nothing downstream has anything
+      // left to fail closed on - the previous session's numbers would simply be
+      // sitting in memory, and the next person to sign in on a shared machine
+      // would see them render before their own bootstrap resolved. Clearing the
+      // token is not enough; the data it unlocked has to go with it.
+      clearQueryCache();
       setUser(null);
       setIsAuthenticated(false);
     }
@@ -114,6 +122,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // can no longer be used, and only the next manual navigation would reveal it.
   useEffect(() => {
     const onSignedOut = () => {
+      // Same reason as the explicit logout above: a session that ended because
+      // the server said so still leaves a populated cache behind, and this path
+      // fires from a 401 inside a request rather than from the user.
+      clearQueryCache();
       setUser(null);
       setIsAuthenticated(false);
     };

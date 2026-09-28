@@ -157,6 +157,7 @@ function shouldRefresh(path: string, alreadyRetried: boolean | undefined): boole
   return !NO_REFRESH_PATHS.test(path);
 }
 
+/** `signal` is threaded through the 401 retry: see `fetchWithTimeout`. */
 type InternalOptions = RequestInit & { alreadyRetried?: boolean };
 
 /** Reads the error envelope, tolerating a proxy that answered with HTML. */
@@ -176,10 +177,59 @@ async function toApiError(res: Response): Promise<ApiError> {
  * timer cannot outlive the request and reject a promise nobody is awaiting,
  * which is the usual source of unhandled rejections in an aborted fetch.
  */
-async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+/**
+ * `fetch` that fails on its own instead of hanging, and that gives up when the
+ * caller gives up.
+ *
+ * Two independent reasons to stop, so two signals rather than one: the
+ * per-request timeout below, and the caller's `signal`. `AbortSignal.any`
+ * composes them, which matters because a data layer cancelling a query when its
+ * component unmounts must not silently replace the timeout with "no timeout" —
+ * a wedged server would then hang the query forever instead of surfacing an
+ * error.
+ *
+ * A caller abort is *not* an error. It is re-thrown as the `DOMException` the
+ * data layer expects so it can ignore it; turning it into an `ApiError` would
+ * put "could not reach the server" in front of a user who merely navigated away.
+ */
+/**
+ * A signal that aborts when any of `signals` aborts.
+ *
+ * `AbortSignal.any()` does this, and every browser has shipped it since March
+ * 2024 - but jsdom 25 does not implement it, so the one environment the test
+ * suite runs in would throw on the line below and every query would fail with a
+ * message about a missing method. Polyfilling it in the test setup would hide
+ * that: the tests would then prove a polyfill works rather than proving the
+ * client does. Twelve lines here means the tests exercise the same code the
+ * browser runs.
+ */
+function anySignal(signals: readonly AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  const abort = (reason: unknown) => {
+    if (!controller.signal.aborted) controller.abort(reason);
+  };
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      abort(signal.reason);
+      break;
+    }
+    signal.addEventListener('abort', () => abort(signal.reason), { once: true });
+  }
+
+  return controller.signal;
+}
+
+// `| null` because `RequestInit['signal']` is typed as nullable, and the value
+// destructured out of the options object carries that through. Widening here
+// rather than coercing at the call site keeps the null where it came from.
+async function fetchWithTimeout(url: string, init: RequestInit, callerSignal?: AbortSignal | null): Promise<Response> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const signal = callerSignal ? anySignal([timeout, callerSignal]) : timeout;
   try {
-    return await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    return await fetch(url, { ...init, signal });
   } catch (cause) {
+    if (callerSignal?.aborted) throw cause;
     if (cause instanceof DOMException && cause.name === 'TimeoutError') {
       throw new ApiError(
         `Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s. The server may be down.`,
@@ -195,28 +245,35 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
 }
 
 async function request<T>(path: string, options: InternalOptions = {}): Promise<T> {
-  const { alreadyRetried, ...init } = options;
+  const { alreadyRetried, signal, ...init } = options;
   const hasBody = init.body !== undefined && init.body !== null;
 
-  const res = await fetchWithTimeout(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      // Only when there is something to send. Setting it on a bodiless GET or on
-      // the PDF blob request is harmless same-origin, but it forces a CORS
-      // preflight on every read in a split-origin deployment, which is a
-      // pointless round trip per request.
-      ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
-      ...authHeaders(),
-      ...init.headers,
+  const res = await fetchWithTimeout(
+    `${BASE}${path}`,
+    {
+      ...init,
+      headers: {
+        // Only when there is something to send. Setting it on a bodiless GET or on
+        // the PDF blob request is harmless same-origin, but it forces a CORS
+        // preflight on every read in a split-origin deployment, which is a
+        // pointless round trip per request.
+        ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
+        ...authHeaders(),
+        ...init.headers,
+      },
+      // The refresh token now lives in an httpOnly cookie, so the browser has to
+      // be told to attach it. Same-origin in production; needed in dev too.
+      credentials: 'include',
     },
-    // The refresh token now lives in an httpOnly cookie, so the browser has to
-    // be told to attach it. Same-origin in production; needed in dev too.
-    credentials: 'include',
-  });
+    signal,
+  );
 
   if (res.status === 401 && shouldRefresh(path, alreadyRetried)) {
     const token = await refreshAccessToken();
-    if (token) return request<T>(path, { ...init, alreadyRetried: true });
+    // The retry carries the caller's signal forward, so cancelling while the
+    // refresh is in flight still cancels the retried request rather than
+    // starting one nobody is waiting for.
+    if (token) return request<T>(path, { ...init, alreadyRetried: true, signal });
     // The refresh token is spent, expired, or was revoked from another device.
     // Nothing left to sign in with, so stop pretending otherwise.
     announceSignedOut();
@@ -229,13 +286,22 @@ async function request<T>(path: string, options: InternalOptions = {}): Promise<
   return (contentType.includes('application/json') ? res.json() : res.blob()) as Promise<T>;
 }
 
+/**
+ * The HTTP surface.
+ *
+ * `signal` is optional on every method, and a caller that supplies one has its
+ * request cancelled when it aborts. That is the whole contract: the data layer
+ * cancels the previous company's request the moment the switcher changes, which
+ * is what removes the last-write-wins race rather than merely hiding it behind a
+ * `cancelled` flag.
+ */
 export const api = {
-  get: <T>(path: string) => request<T>(path, { method: 'GET' }),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
-  put: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }),
-  del: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
-  patch: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
+  get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { method: 'GET', signal }),
+  post: <T>(path: string, body?: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: 'POST', signal, body: body === undefined ? undefined : JSON.stringify(body) }),
+  put: <T>(path: string, body?: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: 'PUT', signal, body: body === undefined ? undefined : JSON.stringify(body) }),
+  del: <T>(path: string, signal?: AbortSignal) => request<T>(path, { method: 'DELETE', signal }),
+  patch: <T>(path: string, body?: unknown, signal?: AbortSignal) =>
+    request<T>(path, { method: 'PATCH', signal, body: body === undefined ? undefined : JSON.stringify(body) }),
 };

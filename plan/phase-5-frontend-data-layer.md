@@ -1,7 +1,7 @@
 # Phase 5 — frontend data layer
 
-**Status:** not started
-**Depends on:** Phase 3c
+**Status:** in progress
+**Depends on:** Phase 3c (`2630072`), Phase 4 (`4327a34`)
 **Breadcrumb in the tree:** `frontend/eslint.config.mjs:34-38`
 
 > Every page fetches in an effect and stores the result in state. That is the
@@ -18,9 +18,10 @@ There is no data-fetching library: `rg 'react-query|swr|apollo|zustand|redux'`
 across `frontend/` returns zero. Every one of the 18 pages hand-rolls
 `useEffect` + `useState` + `loading` + `error` + `empty`, mostly incorrectly.
 
-## Open decision — resolve before starting
+## Open decision — **resolved: TanStack Query**
 
-**TanStack Query, or a hand-rolled `useResource` hook?**
+**The question, as it stood:** TanStack Query, or a hand-rolled `useResource`
+hook?
 
 | | TanStack Query | Hand-rolled `useResource` |
 |---|---|---|
@@ -30,13 +31,132 @@ across `frontend/` returns zero. Every one of the 18 pages hand-rolls
 | Bundle cost | ~13 kB gzip | 0 |
 | Fits this repo's style | weaker | stronger |
 
-This repo is notably light on dependencies and its comments argue for
-hand-rolled choices (e.g. the single-flight refresh in `api.ts` was written by
-hand and is well reasoned). But the frontend already ships an 808 kB entry
-chunk, so 13 kB is not the deciding factor either way.
+The short version of the resolution: the hand-rolled hook fails this phase's own
+definition of done, so keeping the option on the table was not honest.
 
-Phase 3c lands the error-state and cancellation fixes that this phase builds on.
-Whatever is chosen, do not start before 3c is done.
+**Decision: `@tanstack/react-query` v5.**
+
+The decisive argument is not bundle size or style, it is the last item in the
+scope list:
+
+> Then flip `react-hooks/set-state-in-effect` to `error`.
+
+A `useResource` built the obvious way fetches in an effect and commits the
+result with `setState`. That is *the exact pattern the rule forbids*, so the
+hook would need an `eslint-disable` on its own body, and every page's warning
+would be laundered through one file that has a blanket exemption. The rule would
+be green and the defect would be intact, in a file whose whole job is fetching.
+That is the specific outcome the rest of this repo's rules exist to prevent.
+
+TanStack Query keeps the fetched data **outside** React in its own store.
+Components read from it; no effect sets state. The rule goes to `error` because
+the code genuinely stopped doing the thing, not because the check was relaxed.
+
+What it buys that hand-rolling does not:
+
+- **Race-freedom by construction.** A key is `(companyId, path)`. Two
+  in-flight requests for different companies resolve into different entries, so
+  the last-write-wins bug in "Why the current pattern is broken" #2 cannot be
+  written. A hand-rolled hook has to re-implement generation counters, and a
+  subtly wrong one is the exact defect this phase exists to remove.
+- **Dedupe** (defect #5): `Scenarios` and `Dashboard` both read
+  `/metrics/dashboard`; with a shared key they issue one request.
+- **Invalidation** (defect #6): `queryClient.invalidateQueries` after a
+  mutation, replacing the ad-hoc `reload()` in `Metrics.tsx` and the
+  `setAttempt(n => n + 1)` retry counter in six pages.
+- **Retry/backoff and `Retry-After`** (defect #7), which the phase doc lists as
+  required and which no page implements today.
+
+Rejected, and why it is not "the light-dependency option": the 13 kB gzip is
+measured against an 808 kB entry chunk that Phase 5 is separately required to
+shrink, so it is not the binding constraint. The hand-rolled version would also
+be ~120 lines that then grow — dedupe plus invalidation plus abort plus retry is
+the expensive part, and it is exactly the part with no good test story.
+
+**Not decided by the library choice, and decided here instead:** the cache key
+shape. It is the security-relevant decision in this phase.
+
+## Cache keys: the tenant is part of the key, not a filter
+
+Every query key is an array whose **first element is the company id**:
+
+```ts
+export const companyKeys = {
+  all: (companyId: string) => ['company', companyId] as const,
+  dashboard: (companyId: string) => [...companyKeys.all(companyId), 'dashboard'] as const,
+  members: (companyId: string) => [...companyKeys.all(companyId), 'members'] as const,
+};
+```
+
+The reason is a cross-tenant data leak, and it is the reason this phase exists
+rather than a convention worth having. Without the company in the key, the cache
+is keyed on `['dashboard']` alone; switch company and the query is already
+cached, so the app renders the **previous company's financials** under the new
+company's name — a dashboard showing another tenant's MRR. The server is
+correct in every one of those requests; the bug is entirely client-side, which
+is why no backend test can catch it and why the doc requires a frontend test for
+it.
+
+Three consequences, each deliberate:
+
+- **A query with no company id must not be a company query.** `/auth/me`,
+  `/auth/login` and the public share route are not tenant-scoped and take no
+  company in the key. If a hook needs `activeCompanyId` and does not have it, it
+  must not fall back to a shared key — it must not run.
+- **`activeCompanyId` is `null` during bootstrap.** Every page currently guards
+  `if (!activeCompanyId) return`. That guard stays, and it becomes
+  `enabled: activeCompanyId !== null` so the query is disabled rather than
+  fired-and-cancelled.
+- **Signing out must clear the cache, not just the token.** A signed-out shell
+  with a warm cache is the 3c-2 bug with a different shape: the data is already
+  in memory, so no request is made and nothing can fail closed. `queryClient.clear()`
+  goes in the sign-out path alongside `clearSession()`.
+
+Rejected: clearing the cache on company switch instead. It is a single line and
+it would prevent the leak, but it throws away every cached page on each switch
+and re-fetches work that is still valid — and it would leave the *old* company's
+entries in memory, which is the thing a shared machine should not be holding.
+
+## Progress
+
+| Item | State |
+|---|---|
+| TanStack Query v5 installed | done |
+| `lib/queryKeys.ts` — key factories, company first | done |
+| `lib/queryClient.ts` — stale time, retry policy, `clearQueryCache()` | done |
+| `lib/QueryContext.tsx` — provider, mounted in `main.tsx` | done |
+| `lib/api.ts` — `signal` threaded through all five methods | done |
+| Sign-out clears the cache (`AuthContext`) | done |
+| Tenant-isolation and race tests | done — 4 cases, verified to fail without the company in the key |
+| Page migration (18 pages) | not started |
+| `react-hooks/set-state-in-effect` back to `error` | not started |
+| a11y, mobile nav, bundle budget | **moved to [Phase 7](phase-7-accessibility-navigation-bundle.md)** |
+
+### Two decisions made while building it
+
+**`AbortSignal.any()` is not used, deliberately.** It is the obvious way to
+combine the request timeout with the data layer's cancellation signal, and every
+browser has shipped it since March 2024. But jsdom 25 does not implement it, so
+the one environment the test suite runs in threw `anySignal is not a function` on
+the line before `fetch`, and every query failed. The alternative — polyfilling it
+in `src/test/setup.ts` — was rejected because it would make the tests prove a
+polyfill works rather than prove the client does. `api.ts` carries a twelve-line
+`anySignal()` instead, so the tests exercise the same code the browser runs.
+Cost: a helper to maintain. Benefit: the suite tests the real path.
+
+**The tenant-isolation test had to be rewritten, because the first version
+passed for the wrong reason.** It mounted the app a second time after the
+company switch, which built a second `QueryProvider` and therefore a second
+cache — so it started from an empty one and proved nothing about a warm cache,
+which is the only state in which the leak exists. The test now switches company
+by re-rendering one mounted tree, which is what the top bar actually does. The
+reasoning is recorded in the test file's header because the mistake is the kind
+that makes a passing test meaningless, and nothing about the final version of the
+file would reveal it.
+
+Verified by deliberately breaking the key factory: with the company dropped from
+`companyKeys.dashboard`, 3 of the 4 cases go red. The fourth is the no-company
+case, which correctly makes no request either way.
 
 ## Why the current pattern is broken, specifically
 
@@ -77,47 +197,27 @@ Phase 5 is not "add a library". These are the defects it exists to remove:
 
 ## Also folded in, because they are the same class of work
 
-Not strictly a data layer, but they share the reason the data layer was
-introduced, and splitting them across phases would mean touching every page
-twice:
+**Now in [Phase 7](phase-7-accessibility-navigation-bundle.md), not here.** This
+list originally sat in this phase. Every item was accessibility, navigation or
+bundle size, and none of them is fixed by a data layer.
 
-- **No mobile navigation.** `Sidebar.tsx:33` is `hidden md:flex`. Below 768px
-  there is no sidebar, no hamburger, no drawer, and no bottom nav — the only
-  navigation is the ⌘K palette, which is keyboard-only. The app is effectively
-  desktop-only despite being responsive elsewhere.
-- **Bundle size.** 808 kB entry chunk, 368 kB chart chunk, 280 kB CSS, no
-  `build` block in `vite.config.ts` (no `manualChunks`, no `sourcemap`, no
-  `target`), no analysis tool, no budget. Per-page lazy loading already works
-  and is verified in `dist/assets/` — build on that.
-- **`prefers-reduced-motion`.** Exactly one implementation in the whole app
-  (`CountUp.tsx:12`), against `framer-motion` page transitions with
-  `staggerChildren` throughout and **4 infinite CSS animations** in
-  `tailwind.config.ts:63-68` (`shimmer`, `float`, `pulse-dot`).
-- **Dialog accessibility.** `CommandPalette` and `ShortcutsPanel` have
-  `role="dialog"` but no `aria-modal`, no focus trap, no focus restore.
-  `ShortcutsPanel` has **no close button** — Escape or backdrop only. The
-  palette is not a real combobox: bare `<input autoFocus>` with no
-  `role="combobox"`, no `aria-expanded`, no `aria-activedescendant`, and **no
-  arrow-key navigation** of the 14-item list.
-- **No `aria-current="page"`** on the active nav item (`Sidebar.tsx:98-124` —
-  a CSS class and a `layoutId` only). No focus-visible styling, no skip link
-  (`AppShell.tsx:27` goes straight to `<main>` with no id).
-- **`NotificationsBell.tsx:28-43`** — no `aria-expanded`/`aria-haspopup`, no
-  Escape to dismiss.
-- **`Import.tsx:70-72`** — a `<div role="button" tabIndex={0}>` handling
-  `Enter` but not `Space`. Fails WCAG 2.1.1.
-- **`CohortTable.tsx`** — no `<th scope>`, no `<caption>`, and the 5 colour
-  tiers in `cellColor()` (`:5-11`) have no legend.
-- **No `autoComplete`** on any form input; form errors (`Login.tsx:62`,
-  `Signup.tsx:75`) are bare `<p>` with no `role="alert"`.
-- **SEO/meta.** `frontend/index.html` is 18 lines with **no description, no OG
-  tags, no Twitter card, no favicon, no `theme-color`, no manifest**, and a
-  static `<title>` — `document.title` is never managed, so all 18 routes share
-  one title.
-- **Real identity in the chrome.** `Sidebar.tsx:82-87` and `TopBar.tsx:113`
-  hardcode `"DF"` / `"Demo Founder"` while `SessionUser` sits unread.
+The split was made before the page migration started, and the reason is worth
+keeping because the original reasoning was reasonable and still wrong: they do
+share the *layer* below them, but they are not the same *kind* of work. This
+phase's done condition is mechanical — the lint rule is red or it is not — while
+every item over there is a judgement that a checklist can tick while the product
+is still bad. Coupling them also means a data-layer regression can only be
+observed through an accessibility audit nobody has time to run.
+
+Two items stay here rather than moving, because they are data-state defects that
+happened to be listed alongside the a11y work:
+
 - **`ShareView.tsx` has no empty state** and must not be able to sign the user
-  out (3c-5).
+  out (3c-5). A missing empty state is a data-state defect.
+- **Real identity in the chrome.** `Sidebar.tsx:82-87` and `TopBar.tsx:113`
+  hardcode `"DF"` / `"Demo Founder"` while `SessionUser` sits unread. The name is
+  on the identity the server returned in Phase 3c; not reading it is this phase's
+  omission, not an a11y one.
 
 ## Out of scope
 
@@ -136,17 +236,20 @@ deliberate choice), and PWA/offline.
 
 ## Definition of done
 
+- [x] TanStack Query v5 installed and the data layer wired in.
+- [x] Cache keys put the company first, for every tenant-scoped key.
+- [x] `api.ts` threads an `AbortSignal` through all five methods.
+- [x] Signing out clears the cache, not just the token.
+- [x] Tenant-isolation and race tests exist, pass, and are verified to fail when
+      the company is dropped from the key.
 - [ ] All 18 pages use the data layer. No hand-rolled `useEffect` fetch remains.
 - [ ] `react-hooks/set-state-in-effect` is `error` in `eslint.config.mjs`.
 - [ ] `no-explicit-any` and `consistent-type-imports` are back to `error`.
-- [ ] Tenant-isolation and race tests exist and pass.
-- [ ] Mobile navigation exists below 768px.
-- [ ] `prefers-reduced-motion` is honoured globally.
-- [ ] Every dialog traps and restores focus; the palette has combobox
-      semantics and arrow-key navigation.
-- [ ] `aria-current="page"` on the active nav item.
-- [ ] Per-route `document.title`; meta description, OG, Twitter card, favicon
-      and `theme-color` present.
-- [ ] Bundle sizes measured and recorded; a budget exists and is enforced.
-- [ ] `pnpm verify:full` passes and `pnpm test` now includes the frontend.
+- [ ] `ShareView.tsx` has an empty state and cannot sign the user out.
+- [ ] The chrome reads the session's name instead of the hardcoded `"DF"`.
+- [ ] `pnpm verify:full` passes and `pnpm test` includes the frontend.
 - [ ] CHANGELOG.md records the user-visible changes.
+
+Accessibility, mobile navigation, meta tags and the bundle budget are **not** in
+this list. They are in [Phase 7](phase-7-accessibility-navigation-bundle.md),
+with the reasoning for the split.
