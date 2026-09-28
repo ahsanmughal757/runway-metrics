@@ -8,8 +8,10 @@ import { MetricsModule } from './metrics/metrics.module';
 import { CohortsModule } from './cohorts/cohorts.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 import { HealthModule } from './health/health.module';
 import { LoggerModule } from './common/logging/logger.module';
+import { CredentialCryptoModule } from './common/crypto/credential-crypto.module';
 import { PrismaModule } from './prisma.module';
 import { env } from './config/env';
 
@@ -23,6 +25,7 @@ import { env } from './config/env';
     // everything else logs through.
     LoggerModule,
     PrismaModule,
+    CredentialCryptoModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -39,6 +42,7 @@ import { env } from './config/env';
     ReportsModule,
     AuditModule,
     HealthModule,
+    ApiKeysModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

@@ -36,8 +36,8 @@ ticked off and moved to `plan/archive/`.
 Several source comments name the phase that introduced a decision — e.g.
 `backend/eslint.config.mjs:53` ("the Phase 1 fixes"),
 `frontend/eslint.config.mjs:35` ("the Phase 5 rewrite"),
-`backend/src/config/env.ts:146` ("Phase 4 encrypts connector credentials with
-it"), `backend/prisma/schema.prisma:71,261` ("Phase 3").
+`backend/src/config/env.ts` ("it encrypts share-link tokens and any connector
+credential added later"), `backend/prisma/schema.prisma:71,261` ("Phase 3").
 
 **These are how phases 1–3b were reconstructed after the plan was lost.** Keep
 them accurate. If a phase's scope changes, `rg` for the number and fix the

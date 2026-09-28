@@ -31,6 +31,8 @@ export const PERMISSIONS = [
   'reports:share',
 
   'audit:read',
+
+  'apiKeys:manage',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 

@@ -28,14 +28,14 @@ Do not start a new phase without confirming phases before it are done.
 | 2 | Relational multi-tenant rewrite, DB-enforced permissions | **done** (`cb6d80c`) | [archive/phases-1-3b.md](archive/phases-1-3b.md) |
 | 3a | Rotating refresh sessions, httpOnly cookie, reuse detection, devices | **done** (`9abf406`) | [archive/phases-1-3b.md](archive/phases-1-3b.md) |
 | 3b | CAS token claim, fixes the simultaneous-refresh race | **done** (`8adb097`) | [archive/phases-1-3b.md](archive/phases-1-3b.md) |
-| **3c** | **Regressions in shipped phases** | **in progress** | [phase-3c-regressions.md](phase-3c-regressions.md) |
-| 4 | Credential encryption (AES-256-GCM) + real API keys | not started | [phase-4-credential-encryption.md](phase-4-credential-encryption.md) |
+| **3c** | **Regressions in shipped phases** | **done** (`2630072`) | [archive/phase-3c-regressions.md](archive/phase-3c-regressions.md) |
+| 4 | Credential encryption (AES-256-GCM) + real API keys | **in progress** | [phase-4-credential-encryption.md](phase-4-credential-encryption.md) |
 | 5 | Frontend data layer | not started | [phase-5-frontend-data-layer.md](phase-5-frontend-data-layer.md) |
 | 6 | CI, deploy, observability | not started | [phase-6-ci-deploy-observability.md](phase-6-ci-deploy-observability.md) |
 
-Phase 3c is a late insertion. Phases 1–3b shipped with defects that were only
-found by auditing them afterwards — one of them a privilege escalation. It runs
-before Phase 4.
+Phase 3c was a late insertion. Phases 1–3b shipped with defects that were only
+found by auditing them afterwards — one of them a privilege escalation. It ran
+before Phase 4, and moved to `archive/` once its checklist was ticked.
 
 ## Why phases 1–3b are in `archive/`
 

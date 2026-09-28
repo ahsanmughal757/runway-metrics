@@ -45,13 +45,30 @@ const secret = (min: number, label: string) =>
     });
 
 /**
- * A secret that may be absent, and where "absent" is spelled either as an unset
- * variable or as the empty string. `KEY=` is the natural way to leave a value
- * blank in a .env file, and plain `.optional()` rejects it because an empty
- * string is present-but-invalid rather than undefined.
+ * An AES-256 key, as exactly 64 hex characters decoding to 32 bytes.
+ *
+ * The generic `secret` helper only enforces a character count, which is the
+ * wrong test for a key: `Buffer.from(v, 'hex')` stops at the first character
+ * pair it cannot read, so a 64-character non-hex string yields a short key and
+ * the failure appears later, inside the cipher, as an unrelated-looking error.
+ * Validating the shape here turns that into a boot failure that names the
+ * variable.
  */
-const optionalSecret = (min: number, label: string) =>
-  z.preprocess((v) => (v === '' ? undefined : v), secret(min, label).optional());
+const hexKey32 = (label: string) =>
+  z
+    .string()
+    .regex(/^[0-9a-fA-F]{64}$/, `${label} must be 64 hex characters, which is exactly 32 bytes for AES-256 (see scripts/generate-secrets.mjs)`)
+    .refine((v) => !REJECTED_SECRETS.has(v.toLowerCase()), {
+      message: `${label} is a known placeholder value. Generate a real one (see scripts/generate-secrets.mjs)`,
+    });
+
+/**
+ * "Absent" is spelled either as an unset variable or as the empty string.
+ * `KEY=` is the natural way to leave a value blank in a .env file, and plain
+ * `.optional()` rejects it because an empty string is present-but-invalid
+ * rather than undefined.
+ */
+const optionalHexKey32 = (label: string) => z.preprocess((v) => (v === '' ? undefined : v), hexKey32(label).optional());
 
 /** Accepts a comma-separated list, tolerating blanks from empty env files. */
 const csv = z
@@ -113,8 +130,30 @@ const schema = z
 
     CORS_ORIGINS: csv,
 
-    /** AES-256-GCM key for connector credentials. Required in production. */
-    CREDENTIALS_MASTER_KEY: optionalSecret(32, 'CREDENTIALS_MASTER_KEY'),
+    /**
+     * AES-256-GCM key for values the server must be able to read back.
+     * Required in production. 64 hex characters = 32 bytes.
+     *
+     * Phase 4 gave this a real consumer. It was previously required in
+     * production while no code in the repository used it, which is the worst
+     * combination available: a key that must be configured, and never is.
+     */
+    CREDENTIALS_MASTER_KEY: optionalHexKey32('CREDENTIALS_MASTER_KEY'),
+
+    /**
+     * Identifies the active key in every envelope this process writes. Defaults
+     * to `k1` because a single-key deployment has nothing to name.
+     */
+    CREDENTIALS_MASTER_KEY_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).max(64).regex(/^[a-zA-Z0-9._-]+$/, 'CREDENTIALS_MASTER_KEY_ID may only contain letters, digits, dot, underscore and dash').default('k1')),
+
+    /**
+     * Retired keys, as `keyId:hex,keyId:hex`, accepted for *decryption only*.
+     * During rotation both the old and new key are present: the active key
+     * signs new writes while these read the rows written under the old one.
+     * They are removed once every row has been re-encrypted, and removing one
+     * early makes those rows permanently unreadable.
+     */
+    CREDENTIALS_PREVIOUS_KEYS: z.preprocess((v) => (v === '' ? undefined : v), csv.default([])),
 
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
     /** Pretty, human-readable logs for local dev. Always false in production. */
@@ -143,7 +182,7 @@ const schema = z
       ctx.addIssue({
         code: 'custom',
         path: ['CREDENTIALS_MASTER_KEY'],
-        message: 'CREDENTIALS_MASTER_KEY is required in production (Phase 4 encrypts connector credentials with it)',
+        message: 'CREDENTIALS_MASTER_KEY is required in production (it encrypts share-link tokens and any connector credential added later)',
       });
     }
     if (cfg.CORS_ORIGINS.length === 0) {

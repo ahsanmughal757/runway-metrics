@@ -48,6 +48,7 @@ const ENTITY_PHRASES: Record<AuditEntityType, string> = {
   INVITE: 'an invitation',
   REPORT: 'the investor update',
   SHARE_LINK: 'a share link',
+  API_KEY: 'an API key',
 };
 
 export function describeAudit(input: { entityType: AuditEntityType; action: AuditAction }): string {

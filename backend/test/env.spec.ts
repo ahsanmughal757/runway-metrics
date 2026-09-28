@@ -35,7 +35,9 @@ const VALID_PROD = {
   BYPASS_AUTH: 'false',
   LOG_PRETTY: 'false',
   JWT_SECRET: 'prod-jwt-secret-value-long-enough-1234',
-  CREDENTIALS_MASTER_KEY: 'prod-credentials-master-key-123456',
+  // 64 hex characters. The schema checks the decoded length, not the character
+  // count, so a readable phrase no longer passes.
+  CREDENTIALS_MASTER_KEY: 'b'.repeat(64),
   CORS_ORIGINS: 'https://runway.example.com',
   // The refresh cookie is a credential; over http it would cross the network in
   // clear. Production is required to set this, so a valid config includes it.
@@ -128,7 +130,7 @@ describe('env configuration', () => {
 
     it('treats an empty CREDENTIALS_MASTER_KEY as absent rather than invalid', () => {
       // `KEY=` is how a .env expresses "not set yet". Rejecting it would block
-      // a development checkout before Phase 4 has any use for the key.
+      // a development checkout that has no encrypted values to read.
       const result = dev({ CREDENTIALS_MASTER_KEY: '' });
 
       expect(result.ok).toBe(true);
@@ -139,6 +141,26 @@ describe('env configuration', () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.message).toContain('CREDENTIALS_MASTER_KEY');
+    });
+
+    it('rejects a 64-character key that is not hex, which would decode to the wrong length', () => {
+      // The case the old character-count check missed entirely: this passes a
+      // min(32) but Buffer.from(v, 'hex') stops at the first bad pair, yielding
+      // a short key and a confusing failure inside the cipher.
+      const result = dev({ CREDENTIALS_MASTER_KEY: 'z'.repeat(64) });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.message).toMatch(/64 hex characters/);
+    });
+
+    it('accepts a previous-key list, leaving its shape to the crypto service', () => {
+      // CREDENTIALS_PREVIOUS_KEYS is a csv here and a rotation concern there.
+      // Validating the pair format twice would put the rotation error message
+      // in two files; the service is the only place that can say which key is
+      // wrong, and it throws at construction, which is also boot time.
+      const result = dev({ CREDENTIALS_PREVIOUS_KEYS: `k1:${'c'.repeat(64)}` });
+
+      expect(result.ok).toBe(true);
     });
   });
 

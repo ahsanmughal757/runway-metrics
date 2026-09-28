@@ -316,7 +316,8 @@ describe('database invariants', () => {
         prisma.shareLink.create({
           data: {
             companyId: company.id,
-            token: uniqueEmail('share'),
+            tokenHash: uniqueEmail('share'),
+            tokenCiphertext: `v1:k1:AA:BB:${Buffer.from('x').toString('base64url')}`,
             createdById: user.id,
             expiresAt: new Date(Date.now() + 86_400_000),
             viewCount: -1,

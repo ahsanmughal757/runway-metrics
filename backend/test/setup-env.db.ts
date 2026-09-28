@@ -25,7 +25,8 @@ process.env.LOG_PRETTY = 'false';
 process.env.RATE_LIMIT_TTL_SECONDS = '60';
 process.env.RATE_LIMIT_MAX = '100000';
 process.env.AUTH_RATE_LIMIT_MAX = '100000';
-process.env.CREDENTIALS_MASTER_KEY = 'test-credentials-master-key-0123456789';
+// 64 hex characters = exactly 32 bytes. See the note in setup-env.ts.
+process.env.CREDENTIALS_MASTER_KEY = 'a'.repeat(64);
 
 // 127.0.0.1 rather than "localhost": on Windows, Node resolves localhost to
 // ::1 first, and Docker's published port is not reliably reachable over the

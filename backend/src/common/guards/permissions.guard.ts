@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/require-permission.decorator';
 import { PERMISSIONS, roleCan, type Permission } from '../../auth/permissions';
-import type { MembershipRole } from '@prisma/client';
+import type { RequestUser } from '../decorators/current-user.decorator';
 
 /**
  * PRD requirement: "RBAC faked via UI hiding" is a named risk. This guard is
@@ -23,9 +23,18 @@ export class PermissionsGuard implements CanActivate {
     // getRequest() is untyped, so the request is narrowed to the one field
     // this guard reads. Letting it stay `any` would mean an unchecked property
     // access in the only place permission enforcement happens.
-    const req = context.switchToHttp().getRequest<{ user?: { role?: MembershipRole } }>();
-    const role = req.user?.role;
-    const granted = role ? required.some((permission) => roleCan(role, permission)) : false;
+    const req = context.switchToHttp().getRequest<{ user?: Pick<RequestUser, 'role' | 'apiKeyId' | 'permissions'> }>();
+    const user = req.user;
+
+    // A key is authorised by its own scopes and never by a role, so the two are
+    // resolved from different fields. A key holds a subset of the permission
+    // vocabulary that issuance validated, and `apiKeys:manage` is refused at
+    // issuance, so there is no scope that would let one manage keys.
+    const granted = user?.apiKeyId
+      ? required.some((permission) => user.permissions.includes(permission))
+      : user?.role
+        ? required.some((permission) => roleCan(user.role, permission))
+        : false;
 
     if (!granted) {
       // Name the missing permission, not the role. The message is for whoever

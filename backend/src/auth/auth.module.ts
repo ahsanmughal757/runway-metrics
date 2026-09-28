@@ -20,6 +20,9 @@ import { env } from '../config/env';
       secret: env.JWT_SECRET,
       signOptions: { expiresIn: env.ACCESS_TOKEN_TTL_SECONDS },
     }),
+    // ApiKeysModule is deliberately absent. AuthGuard does need ApiKeysService
+    // to authenticate a presented X-Api-Key, but that module is @Global precisely
+    // so this one does not have to reach back for it - see the comment there.
   ],
   providers: [AuthService, SessionsService, JwtStrategy, AuthGuard, MembershipResolver],
   controllers: [AuthController],

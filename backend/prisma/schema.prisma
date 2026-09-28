@@ -47,6 +47,7 @@ enum AuditEntityType {
   INVITE
   REPORT
   SHARE_LINK
+  API_KEY
 }
 
 enum AuditAction {
@@ -79,6 +80,7 @@ model User {
   auditLogs   AuditLog[]
   shareLinks  ShareLink[]
   sessions    Session[]
+  apiKeys     ApiKey[]
 }
 
 // A tenant. Not an "organisation" in the enterprise sense: one account can hold
@@ -103,6 +105,7 @@ model Company {
   customerMonths CustomerMonthlyValue[]
   auditLogs     AuditLog[]
   shareLinks    ShareLink[]
+  apiKeys       ApiKey[]
 }
 
 model CompanyMembership {
@@ -223,7 +226,18 @@ model CustomerMonthlyValue {
 model ShareLink {
   id          String    @id @default(cuid())
   companyId   String
-  token       String    @unique
+  /// The token as presented in the URL, encrypted. Retained because the product
+  /// has to be able to show a company the link it already handed out; without
+  /// it, every existing share link would have to be reissued to be listed, and
+  /// one that cannot be listed cannot be revoked from the UI either.
+  tokenCiphertext String
+  /// SHA-256 of the token, unique and indexed, and the only thing a lookup
+  /// goes through. Encrypted values cannot be indexed, and scanning every row
+  /// to find one token would make the public dashboard endpoint's cost grow
+  /// with the number of links in the system rather than staying constant.
+  /// Same split as Session.tokenHash and as any password store: the index
+  /// cannot be reversed, the ciphertext can.
+  tokenHash      String    @unique
   createdById String
   expiresAt   DateTime
   revokedAt   DateTime?
@@ -254,6 +268,41 @@ model AuditLog {
   user    User    @relation(fields: [changedBy], references: [id])
 
   @@index([companyId, changedAt])
+}
+
+// A company-scoped, non-expiring-by-default machine credential. The secret is
+// shown once and never again: only a hash is kept, so the table is not a list
+// of working credentials if it is ever read. `prefix` exists so a presented
+// key can be located by an indexed equality match without trying every hash in
+// the table, the same reason a GitHub or Stripe key is printed with a visible
+// head.
+model ApiKey {
+  id        String   @id @default(cuid())
+  companyId String
+  /// Human label. The only part of the row that is safe to render anywhere.
+  name      String
+  /// Short, indexed, non-secret head of the key (e.g. `rw_live_a1b2c3`) shown
+  /// in the UI so a person can tell two keys apart.
+  prefix    String   @unique
+  /// SHA-256 of the full secret. Not reversible, and deliberately not
+  /// recoverable: a key that could be re-displayed is a key that a database
+  /// dump can replay.
+  secretHash String  @unique
+  /// Names what this key may do, drawn from the same vocabulary as a role's
+  /// permissions rather than a second parallel scheme. A key can never hold
+  /// `apiKeys:manage`, so it cannot mint a copy of itself.
+  scopes    String[]
+  lastUsedAt DateTime?
+  expiresAt DateTime?
+  revokedAt  DateTime?
+  createdById String
+  createdAt  DateTime  @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, revokedAt])
 }
 
 // Refresh tokens, hashed. familyId groups a rotation chain so that replaying a

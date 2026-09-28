@@ -25,5 +25,8 @@ process.env.AUTH_RATE_LIMIT_MAX = '100000';
 // loadEnvFile() at import time, which respects these values. This keeps
 // config-dependent tests deterministic instead of dependent on local machine
 // state.
-process.env.CREDENTIALS_MASTER_KEY = 'test-credentials-master-key-0123456789';
+// 64 hex characters = exactly 32 bytes. The earlier value was a readable
+// 37-character phrase, which the old character-count check accepted and the
+// AES-256 check correctly rejects -- a test key still has to be a real key.
+process.env.CREDENTIALS_MASTER_KEY = 'a'.repeat(64);
 process.env.ENABLE_DATABASE = 'false';

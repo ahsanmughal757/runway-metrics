@@ -38,6 +38,29 @@ export interface RequestUser {
    * verification, membership resolution - stays valid without being edited.
    */
   demo?: true;
+
+  /**
+   * Set only by ApiKeyGuard, when the caller authenticated with an API key
+   * rather than a session.
+   *
+   * The distinction exists because a key is not a person. Every field above is
+   * either a human fact (userId, email, name) or a fact about a membership that
+   * has since been resolved into a role, and neither describes a machine
+   * credential. Rather than pretend otherwise -- minting a synthetic user, or
+   * borrowing the key creator's identity so a key would inherit that person's
+   * later demotion -- the type says what actually authenticated the request.
+   *
+   * A key also carries its own `permissions` that have nothing to do with
+   * `role`, which is why `roleCan` alone cannot be the whole of enforcement for
+   * these requests. See PermissionsGuard.
+   */
+  apiKeyId?: string;
+  /**
+   * Label for audit rows written by a key caller, e.g. `API key:Reporting key`.
+   * AuditLog.changedBy is a foreign key to User, so a machine has no id to put
+   * there; this is the honest substitute and the audit service prefers it.
+   */
+  actorLabel?: string;
 }
 
 export function permissionsOf(user: Pick<RequestUser, 'role'>): readonly Permission[] {

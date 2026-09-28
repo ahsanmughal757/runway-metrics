@@ -26,6 +26,7 @@ import {
   registerOwner,
   uniqueEmail,
 } from './harness';
+import { hashToken } from '../../src/reports/share.service';
 
 const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000);
 
@@ -489,7 +490,7 @@ describe('invites and share links (real database)', () => {
         .set(as(owner.accessToken, owner.companyId))
         .expect(201);
 
-      const row = await prisma.shareLink.findUniqueOrThrow({ where: { token: link.body.token } });
+      const row = await prisma.shareLink.findUniqueOrThrow({ where: { tokenHash: hashToken(link.body.token) } });
       expect(row.companyId).toBe(owner.companyId);
       expect(row.createdById).toBe(owner.userId);
       expect(row.revokedAt).toBeNull();
@@ -505,7 +506,7 @@ describe('invites and share links (real database)', () => {
       await request(app.getHttpServer()).get(`/api/public/dashboard/${link.body.token}`).expect(200);
       await request(app.getHttpServer()).get(`/api/public/dashboard/${link.body.token}`).expect(200);
 
-      const row = await prisma.shareLink.findUniqueOrThrow({ where: { token: link.body.token } });
+      const row = await prisma.shareLink.findUniqueOrThrow({ where: { tokenHash: hashToken(link.body.token) } });
       expect(row.viewCount).toBe(2);
       expect(row.lastViewedAt).not.toBeNull();
     });
@@ -516,7 +517,7 @@ describe('invites and share links (real database)', () => {
         .post('/api/reports/share-link')
         .set(as(owner.accessToken, owner.companyId))
         .expect(201);
-      const row = await prisma.shareLink.findUniqueOrThrow({ where: { token: link.body.token } });
+      const row = await prisma.shareLink.findUniqueOrThrow({ where: { tokenHash: hashToken(link.body.token) } });
 
       await request(app.getHttpServer())
         .delete(`/api/reports/share-links/${row.id}`)
@@ -535,7 +536,7 @@ describe('invites and share links (real database)', () => {
         .expect(201);
 
       await prisma.shareLink.update({
-        where: { token: link.body.token },
+        where: { tokenHash: hashToken(link.body.token) },
         data: ageRow(),
       });
 
@@ -568,7 +569,7 @@ describe('invites and share links (real database)', () => {
         .post('/api/reports/share-link')
         .set(as(a.accessToken, a.companyId))
         .expect(201);
-      const row = await prisma.shareLink.findUniqueOrThrow({ where: { token: link.body.token } });
+      const row = await prisma.shareLink.findUniqueOrThrow({ where: { tokenHash: hashToken(link.body.token) } });
 
       await request(app.getHttpServer())
         .delete(`/api/reports/share-links/${row.id}`)

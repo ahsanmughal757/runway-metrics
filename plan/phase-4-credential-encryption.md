@@ -119,18 +119,165 @@ it is in scope.
 - A test asserting **no plaintext key ever reaches the database** is worth more
   than the individual round-trip tests.
 
+## Scope changes made in implementation
+
+Two changes were forced by reading the code before writing it. Both are recorded
+here rather than quietly applied.
+
+### 4-1 was re-pointed from connector credentials to share-link tokens
+
+The crypto service was specified for "connector credentials", and connectors are
+out of scope in the same document. Left alone, 4-1 through 4-4 would have
+produced a crypto module with **no caller** — the API key work never decrypts
+anything, because a key is hashed and that is precisely why it is shown once.
+The phase's own DoD, "`CREDENTIALS_MASTER_KEY` has a real consumer", would have
+been unsatisfiable while `env.ts` hard-required the key in production.
+
+The live problem that made the choice obvious is one the original document did
+not mention: `ShareLink.token` was stored **in the clear** in a `@unique` column,
+and it is the entire credential for `GET /api/reports/public/dashboard/:token`, a
+deliberately unauthenticated endpoint. `share.service.ts` said so in a comment
+("the only thing standing between a leaked URL and a stranger reading a
+company's financials") while storing it where any `SELECT *` would return it.
+
+So the encryptor has a real caller from day one and a real secret to protect.
+
+### `resolve()` must stay an index lookup, so both columns exist
+
+`resolve()` is a `findUnique` on the token, which means the lookup value has to be
+indexable, and **an encrypted value cannot be indexed** — AES-GCM output is
+non-deterministic by design. Encrypt-only would mean reading every share link in
+the table on every public page view, which is O(n) and gets worse as the table
+grows. That was the reasoning behind question 2; the answer recorded is both.
+
+- `tokenHash` — SHA-256, `@unique`, the only lookup path.
+- `tokenCiphertext` — the versioned envelope, kept so the product can still show
+  a company the link it already handed out.
+
+The same split `Session.tokenHash` already uses, and the one password managers
+use. The alternative — showing the share URL exactly once and never again — was
+considered and rejected as a real UX regression for a security gain that
+`tokenHash` alone would have delivered anyway.
+
+### 4-4 is not deferred: keys are accepted for authentication
+
+Original 4-4 said "decide whether keys are accepted". Deferring it would have
+shipped keys that are created, displayed and listed but rejected by the API,
+which is the exact failure this phase exists to correct — a plausible screen
+backed by nothing. The guard is therefore part of this phase.
+
+The complication that made it a decision rather than a patch: `RequestUser`
+requires `userId`, `email`, `role` and `permissions`, and every
+`@CurrentUser()` consumer assumes a human, including `AuditLog.changedBy`, which
+is a **required foreign key to `User`**. A key has no user id to put there.
+
+The resolution, and the rejected option:
+
+- `RequestUser` gained optional `apiKeyId` and `actorLabel`. A key identity
+  carries `role: 'VIEWER'` and the key's own `permissions`, and
+  `PermissionsGuard` branches on `apiKeyId` to check the *key's* scopes rather
+  than a role. Audit records for a key are attributed to the human who created
+  it, with the key id in the diff.
+- **Rejected: mint a synthetic `User` row per key.** It would have made
+  `changedBy` a valid id, and it would have invented an account that appears in
+  the members list, can hold sessions, and inherits whatever role it is later
+  changed to. A machine credential must not borrow a human's identity — that is
+  the same rule as Phase 3c's "the browser is never the authority", pointed the
+  other way.
+
+### Who may issue a key
+
+`OWNER` only was the original proposal. `OWNER` **and** `ADMIN` is what shipped,
+by deliberate decision: an ADMIN can already do everything an owner can except
+delete the company and change ownership, and gating on owner alone would push
+real integrations into the "share your owner's password" pattern. The reasoning
+is in the `ROLE_PERMISSIONS` comment in `backend/src/auth/permissions.ts` and is
+pinned by a test named for the intent, so it cannot drift quietly.
+
+A key may hold **any subset of `PERMISSIONS` except `apiKeys:manage`**
+(`KEY_FORBIDDEN_SCOPES`). Without that exclusion a key could mint a replacement
+for itself with every scope, which turns revoking one into a race against the
+attacker. The database CHECK constraint enforces the same list, so a direct
+write or a future script cannot bypass it.
+
+### The `CREDENTIALS_MASTER_KEY` check was tightened, and it caught a real fixture
+
+The variable was validated by `optionalSecret(32)`, which counts **characters**.
+A 32-character non-hex value passes and then `Buffer.from(v, 'hex')` returns the
+wrong number of bytes, so the failure would surface inside the cipher with a
+message about the cipher. It is now a 64-hex-character check, with a comment
+saying why a character count is the wrong test for a key.
+
+This immediately failed the whole test suite: both `setup-env.ts` and
+`setup-env.db.ts` used `test-credentials-master-key-0123456789`, 37 readable
+characters. That is the check working, not the check being awkward. Note that
+the character-count check had *also* been passing a key that AES-256 could not
+use — the old fixtures only worked because nothing used the key yet.
+
+### Rotation requires a rewrite pass, and the migration cannot do it
+
+The migration backfills `tokenHash` in SQL (hashing needs no secret) but leaves
+`tokenCiphertext` as `'pending:' + token`. Encrypting in the migration would mean
+committing the master key to git. `backend/src/scripts/reencrypt-share-tokens.ts`
+rewrites those rows; it selects on the `pending:` marker rather than "every row"
+so that a rerun is provably a no-op, and it exits non-zero on failure so a
+deploy step cannot report success over a partial pass.
+
+The order an operator must follow, which is the part rotation usually gets wrong:
+
+1. Generate the new key, append it as `k2:<hex>` to `CREDENTIALS_PREVIOUS_KEYS`,
+   and leave the old one active.
+2. Deploy. New rows are written under the new key; old rows still read.
+3. Run the re-encrypt script to rewrite rows still under the old key.
+4. Only then remove the old key from `CREDENTIALS_PREVIOUS_KEYS`.
+
+Removing a key before step 3 makes those rows permanently unreadable. The
+`UnknownKeyError` message says so, because an operator who reaches it will
+otherwise suspect tampering.
+
+### Two modules became `@Global()`, and the `forwardRef`s went away
+
+Wiring this up produced a 3-way cycle: `ApiKeysModule → AuditModule →
+AuthModule → ApiKeysModule`, which crashed the app at boot with a decorator
+capturing `undefined`. The honest version of what that cycle is, because the
+symptom points somewhere unhelpful:
+
+- `AuthGuard` authenticates a presented key, so it needs `ApiKeysService`.
+- A guard named in `@UseGuards(...)` is constructed against the module that
+  owns the **controller** — so `AuthGuard` in `MetricsModule` needs
+  `ApiKeysService` to be resolvable from `MetricsModule`, not from `AuthModule`.
+- `ApiKeysService` records issuance, so it needs `AuditService`.
+
+The first attempt used `forwardRef` on both sides of `AuthModule` ⇄
+`ApiKeysModule`, which is what the Nest error message suggests and which fixes
+the boot crash. It was kept for one iteration and then removed, because it does
+not fix the actual problem: it makes the *module graph* resolvable while leaving
+`AuthGuard` unconstructible anywhere but `AuthModule`, so every API-key request
+returns 500 with `Cannot read properties of undefined (reading 'authenticate')`.
+
+Making `ApiKeysModule` `@Global()` fixes both, and dissolves the back-reference:
+`AuthModule` no longer imports `ApiKeysModule` at all, so no `forwardRef` remains
+anywhere. `AuditModule` is `@Global()` for the same reason — the audit trail is
+written from every domain module and only its service is ever wanted.
+
+**Rejected:** registering `AuthGuard` in each domain module's `providers`. It
+works, and it is exactly the kind of omission that fails open: the next module
+added would forget, and its endpoints would accept a key with no authentication
+at all.
+
 ## Definition of done
 
-- [ ] `CREDENTIALS_MASTER_KEY` has a real consumer. `rg createCipheriv` returns
+- [x] `CREDENTIALS_MASTER_KEY` has a real consumer. `rg createCipheriv` returns
       a hit.
-- [ ] Key rotation works and is tested.
-- [ ] `ApiKey` is stored hashed, with an indexed prefix, tenant-scoped.
-- [ ] `ApiKeys.tsx` makes real API calls. The simulated `seedKeys`/`makeMasked`
+- [x] Key rotation works and is tested.
+- [x] `ApiKey` is stored hashed, with an indexed prefix, tenant-scoped.
+- [x] `ApiKeys.tsx` makes real API calls. The simulated `seedKeys`/`makeMasked`
       are gone.
-- [ ] It is written down in this file whether keys are accepted for
-      authentication yet.
-- [ ] `pnpm verify:full` passes.
-- [ ] CHANGELOG.md records the new endpoints and the once-only key display.
-- [ ] The `env.ts:146` message, which currently promises a capability in the
-      future tense, is updated — and every other phase breadcrumb is re-grepped
-      for accuracy.
+- [x] It is written down in this file whether keys are accepted for
+      authentication yet. **They are** — see "Scope changes made in
+      implementation".
+- [x] `pnpm verify:full` passes.
+- [x] CHANGELOG.md records the new endpoints and the once-only key display.
+      Two entries: the plaintext share-token fix and the API keys.
+- [x] The `env.ts` message, which promised a capability in the future tense, is
+      updated — and every other phase breadcrumb is re-grepped for accuracy.
