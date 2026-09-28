@@ -171,7 +171,8 @@ export class SessionsService {
   }
 
   /**
-   * Everything this user has signed in from, newest first, for the device list.
+   * Everything this user has signed in from, most recently active first, for the
+   * device list.
    *
    * Revoked and expired rows are filtered out rather than shown greyed out: a
    * device the user has already signed out of is noise, and the list exists to
@@ -181,11 +182,23 @@ export class SessionsService {
    * it the list cannot tell the user which entry is the device they are typing
    * on, and revoking the wrong one signs *them* out - which reads as a bug and
    * trains people to distrust the page.
+   *
+   * `nulls: 'last'` is load-bearing, not decoration. PostgreSQL sorts NULLS FIRST
+   * on a DESC sort, and `lastUsedAt` is null for every session that has signed in
+   * and never refreshed. Plain `orderBy: { lastUsedAt: 'desc' }` therefore ranked
+   * the *least* recently used devices at the top of a list the UI labels "newest
+   * activity first" - inverting the one thing the page is for. A session signed
+   * in to and never touched should read as stale, and SQL's default says it is
+   * the freshest thing there.
+   *
+   * `createdAt` breaks ties so the order is total. Two devices can share a
+   * millisecond, and an unstable order would shuffle rows between renders, which
+   * looks like the list is lying.
    */
   async listForUser(userId: string, currentFamilyId?: string | null) {
     const rows = await this.prisma.session.findMany({
       where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
-      orderBy: { lastUsedAt: 'desc' },
+      orderBy: [{ lastUsedAt: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }],
     });
     return rows.map((row) => ({
       id: row.id,

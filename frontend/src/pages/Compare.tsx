@@ -8,6 +8,7 @@ import type { DashboardResponse } from '../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from '../components/charts/chartTheme';
 import { ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { ErrorState } from '../components/ErrorState';
 
 const OTHER_PERSONAS: Record<string, { key: string; label: string }[]> = {
   'demo-company-steady': [
@@ -33,32 +34,63 @@ export function Compare() {
   const [compareLabel, setCompareLabel] = useState('');
   const [compareData, setCompareData] = useState<{ month: string; mrr: number }[] | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [compareError, setCompareError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
 
   const options = activeCompanyId ? OTHER_PERSONAS[activeCompanyId] ?? [] : [];
 
   useEffect(() => {
     if (!activeCompanyId) return;
-    api.get<DashboardResponse>('/metrics/dashboard').then(setOwn);
+    let cancelled = false;
+    setOwn(null);
+    setError(null);
+    api
+      .get<DashboardResponse>('/metrics/dashboard')
+      .then((d) => {
+        if (!cancelled) setOwn(d);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e);
+      });
     if (options.length > 0 && !comparePersona) setComparePersona(options[0].key);
+    return () => {
+      cancelled = true;
+    };
   }, [activeCompanyId, role]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!comparePersona) return;
+    let cancelled = false;
     setUnavailable(false);
+    setCompareError(null);
+    // Cleared on every switch, not just on success. Without this a failed fetch
+    // left the *previous* persona's series in state while the selector showed
+    // the *new* persona, so the chart confidently attributed another company's
+    // MRR to the company the reader had just selected.
+    setCompareData(null);
     api
       .get<{ available: boolean; companyName?: string; snapshots?: { month: string; mrr: number }[]; reason?: string }>(
         `/metrics/compare/${comparePersona}`,
       )
       .then((res) => {
+        if (cancelled) return;
         if (!res.available) {
           setUnavailable(true);
           return;
         }
         setCompareLabel(res.companyName ?? comparePersona);
         setCompareData(res.snapshots ?? []);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setCompareError(e);
       });
-  }, [comparePersona]);
+    return () => {
+      cancelled = true;
+    };
+  }, [comparePersona, attempt]);
 
+  if (error) return <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />;
   if (!own) return <ChartCardSkeleton height={360} />;
 
   if (options.length === 0) {
@@ -103,15 +135,17 @@ export function Compare() {
         </Select>
       </div>
 
+      {compareError !== null && <ErrorState error={compareError} onRetry={() => setAttempt((n) => n + 1)} />}
+
       {unavailable && (
         <EmptyState
           icon={GitCompare}
           title="Comparison is demo-mode only"
-          description="Cross-company comparison intentionally isn't available when ENABLE_DATABASE=true — real mode never allows one tenant to read another's data."
+          description="Cross-company comparison intentionally isn't available when ENABLE_DATABASE=true - real mode never allows one tenant to read another's data."
         />
       )}
 
-      {!unavailable && (
+      {!unavailable && !compareError && (
         <div className="runway-card overflow-hidden">
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-3">
             <h3 className="text-sm font-semibold text-runway-text">MRR — this company vs. {compareLabel || '…'}</h3>

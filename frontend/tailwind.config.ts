@@ -79,7 +79,17 @@ export default {
   },
   plugins: [
     heroui({
-      defaultTheme: 'runwayDark',
+      // Only the two built-in names are valid here (`"light" | "dark"`). This
+      // used to read `'runwayDark'`, which TypeScript rejected as soon as this
+      // file was added to the typecheck - it had never been checked, because
+      // `tsconfig.json` only included `src`.
+      //
+      // No runtime change: the custom palettes are selected by the
+      // `runwayDark`/`runwayLight` classes that `applyTheme()` toggles on <html>,
+      // not by this option, so the invalid value was already being discarded.
+      // This is only the fallback for components rendered outside that class
+      // scheme, and it is now a value the plugin accepts.
+      defaultTheme: 'dark',
       defaultExtendTheme: 'dark',
       themes: {
         runwayDark: {

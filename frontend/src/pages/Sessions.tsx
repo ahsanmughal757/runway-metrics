@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react';
 import { MonitorSmartphone } from 'lucide-react';
-import { api } from '../lib/api';
+import { ApiError, api } from '../lib/api';
 import { useToast } from '../lib/ToastContext';
 import { TableSkeleton } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 
 interface SessionRow {
   id: string;
@@ -75,17 +76,40 @@ export function Sessions() {
   const { push } = useToast();
   const [sessions, setSessions] = useState<SessionRow[] | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   const [revoking, setRevoking] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setSessions(null);
+    setUnavailable(false);
+    setError(null);
     api
       .get<SessionRow[]>('/auth/sessions')
-      .then(setSessions)
-      // In demo mode the API has no session table and refuses the route. Saying
-      // "no devices are signed in" there would be a lie: the user would conclude
-      // they are safe when the list was never consulted.
-      .catch(() => setUnavailable(true));
-  }, []);
+      .then((rows) => {
+        if (!cancelled) setSessions(rows);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        // In demo mode the API has no session table and refuses the route. Saying
+        // "no devices are signed in" there would be a lie: the user would conclude
+        // they are safe when the list was never consulted.
+        //
+        // Only a refusal earns that explanation. An unreachable API or a 500 is a
+        // different failure, and it used to land here too - which meant a backend
+        // that was merely down told the reader to go and enable the database.
+        const status = e instanceof ApiError ? e.status : undefined;
+        if (status === 403 || status === 404) {
+          setUnavailable(true);
+          return;
+        }
+        setError(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt]);
 
   async function revoke(row: SessionRow) {
     setRevoking(row.id);
@@ -128,7 +152,12 @@ export function Sessions() {
             <span className="text-sm font-semibold text-runway-text">Devices</span>
           </div>
           <div className="relative px-4 pb-4">
-            {sessions === null && !unavailable && <TableSkeleton rows={3} />}
+            {sessions === null && !unavailable && !error && <TableSkeleton rows={3} />}
+            {error !== null && (
+              <div className="px-1 py-2">
+                <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />
+              </div>
+            )}
             {unavailable && (
               <p className="text-sm text-runway-muted px-1 py-6 text-center">
                 Sessions are only tracked when the API runs against a database. Start it with{' '}

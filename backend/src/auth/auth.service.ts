@@ -114,6 +114,9 @@ export class AuthService {
       companyId: user.companyId,
       role: user.role,
       permissions: user.permissions,
+      // Coerced to a boolean so the client never has to distinguish "absent"
+      // from "false", which is a distinction it cannot act on correctly.
+      demo: user.demo === true,
       memberships: await this.membershipsFor(user.userId),
     };
   }

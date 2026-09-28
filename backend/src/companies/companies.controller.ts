@@ -61,19 +61,28 @@ export class CompaniesController {
   ) {
     // An ADMIN can manage the team but must not outrank an OWNER. Enforced from
     // the caller's own role, so it holds even if the permission table is later
-    // widened by mistake.
+    // widened by mistake. The repository re-checks inside its transaction.
     this.assertOutranks(user, dto.role);
-    return this.repo.updateMemberRole(user.companyId, membershipId, dto.role, user.userId);
+    return this.repo.updateMemberRole(user.companyId, membershipId, dto.role, user.userId, user.role);
   }
 
   @Delete('members/:membershipId')
   @UseGuards(PermissionsGuard)
   @RequirePermission('members:remove')
   removeMember(@CurrentUser() user: RequestUser, @Param('membershipId') membershipId: string) {
-    return this.repo.removeMember(user.companyId, membershipId, user.userId);
+    // No rank check here. The repository enforces it inside the transaction that
+    // performs the delete, because the caller's role and the target's role are
+    // both read there and a check made earlier could be invalidated by a
+    // concurrent role change before the delete lands. `members:remove` alone is
+    // not sufficient: ADMIN holds it too, and without the in-transaction check an
+    // ADMIN could remove an OWNER.
+    return this.repo.removeMember(user.companyId, membershipId, user.userId, user.role);
   }
 
   private assertOutranks(actor: RequestUser, targetRole: MembershipRole) {
+    // An early 403 so the common case never reaches the database. The repository
+    // repeats this inside its transaction, and that second check is the one that
+    // actually holds; this one is an optimisation, not the enforcement.
     if (actor.role !== MembershipRole.OWNER && ROLE_RANK[targetRole] >= ROLE_RANK[actor.role]) {
       throw new ForbiddenException('You cannot grant a role at or above your own');
     }

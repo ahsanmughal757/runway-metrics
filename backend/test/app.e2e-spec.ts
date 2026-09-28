@@ -190,6 +190,19 @@ describe('Runway API (e2e)', () => {
       expect(Array.isArray(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThan(0);
     });
+
+    it('declares the identity a demo one', async () => {
+      // The client gates two top-bar controls on this, and they need opposite
+      // settings: the viewpoint switcher only works in demo mode (`X-Demo-Role`
+      // is read by BypassAuthGuard alone), sign-out only works against a real
+      // session. The browser cannot tell the modes apart - a healthy demo and a
+      // signed-out browser are both just "no local token" - so the server has to
+      // say which it is, and the `demo-user` id is not a signal the client should
+      // be parsing out of a response to guess from.
+      const res = await asFounder('/api/auth/me').expect(200);
+
+      expect(res.body.demo).toBe(true);
+    });
   });
 
   describe('throttling', () => {

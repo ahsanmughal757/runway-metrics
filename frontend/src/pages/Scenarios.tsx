@@ -6,16 +6,35 @@ import type { DashboardResponse } from '../lib/types';
 import { RunwayScenarioSlider } from '../components/RunwayScenarioSlider';
 import { ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { ErrorState } from '../components/ErrorState';
 
 export function Scenarios() {
   const { activeCompanyId, role } = useCompany();
   const [data, setData] = useState<DashboardResponse | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!activeCompanyId) return;
-    api.get<DashboardResponse>('/metrics/dashboard').then(setData);
-  }, [activeCompanyId, role]);
+    let cancelled = false;
+    setData(null);
+    setError(null);
+    api
+      .get<DashboardResponse>('/metrics/dashboard')
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e);
+      });
+    // `attempt` is the retry key: bumping it re-runs this effect. Without it the
+    // only way back from a failed load was a full page reload.
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCompanyId, role, attempt]);
 
+  if (error) return <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />;
   if (!data) return <ChartCardSkeleton height={360} />;
 
   const latest = data.latest;

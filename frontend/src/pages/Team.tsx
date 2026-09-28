@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
 import { TableSkeleton } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLES, type Role } from '../lib/permissions';
 
 interface Member {
@@ -27,13 +28,27 @@ export function Team() {
   const { activeCompanyId, role, can } = useCompany();
   const { push } = useToast();
   const [members, setMembers] = useState<Member[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   const canManage = can('members:updateRole');
 
   useEffect(() => {
     if (!activeCompanyId) return;
+    let cancelled = false;
     setMembers(null);
-    api.get<Member[]>('/companies/members').then(setMembers);
-  }, [activeCompanyId, role]);
+    setError(null);
+    api
+      .get<Member[]>('/companies/members')
+      .then((rows) => {
+        if (!cancelled) setMembers(rows);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCompanyId, role, attempt]);
 
   async function changeRole(member: Member, next: Role) {
     try {
@@ -66,6 +81,10 @@ export function Team() {
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">Team</h2>
         <p className="text-sm text-runway-muted mt-0.5">Everyone with access to this workspace, and what they can do.</p>
       </motion.div>
+
+      {/* Before this the members table had no failure branch: a rejected fetch
+          left `members` null forever and the skeleton on screen indefinitely. */}
+      {error !== null && <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />}
 
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <div className="runway-card overflow-hidden">

@@ -7,6 +7,7 @@ import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
 import { EmptyState } from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 import { ROLE_LABELS, ROLES, type Role } from '../lib/permissions';
 
 interface Invite {
@@ -38,6 +39,8 @@ export function Invites() {
   const { activeCompanyId, role, can } = useCompany();
   const { push } = useToast();
   const [invites, setInvites] = useState<Invite[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   const [email, setEmail] = useState('');
   const [grantRole, setGrantRole] = useState<Role>('VIEWER');
   const [submitting, setSubmitting] = useState(false);
@@ -45,9 +48,21 @@ export function Invites() {
 
   useEffect(() => {
     if (!activeCompanyId) return;
+    let cancelled = false;
     setInvites(null);
-    api.get<Invite[]>('/companies/invites').then(setInvites);
-  }, [activeCompanyId, role]);
+    setError(null);
+    api
+      .get<Invite[]>('/companies/invites')
+      .then((rows) => {
+        if (!cancelled) setInvites(rows);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCompanyId, role, attempt]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -83,6 +98,8 @@ export function Invites() {
           dashboard, cohorts and reports, and change nothing.
         </p>
       </div>
+
+      {error !== null && <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />}
 
       {canInvite ? (
         <div className="runway-card p-5">

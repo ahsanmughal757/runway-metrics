@@ -10,7 +10,7 @@ import { useCompany } from '../lib/CompanyContext';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  const { error } = useCompany();
+  const { error, offline } = useCompany();
 
   return (
     <div className="relative flex min-h-screen">
@@ -27,9 +27,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="flex-1 max-w-[1400px] w-full mx-auto px-6 py-7">
           <ErrorBoundary>
             {error ? (
+              // The message is the server's own, so it is shown rather than
+              // replaced - but the *advice* is what had to change. This used to
+              // say "check that the backend is running" for every failure, which
+              // is actively wrong for a 401 (the backend is fine, you are signed
+              // out) and for a permission failure. A dead network now says so.
               <div className="runway-card p-5 text-sm text-runway-negative border-runway-negative/30">
-                Failed to load company data: {error}. Check that the backend is running (see README: demo mode needs
-                BYPASS_AUTH=true).
+                Failed to load company data: {error}.{' '}
+                {offline
+                  ? 'The API did not respond at all - check that the backend is running (see README: demo mode needs BYPASS_AUTH=true).'
+                  : 'If this persists, check that the backend is running with the settings this deployment expects.'}
               </div>
             ) : (
               <motion.div

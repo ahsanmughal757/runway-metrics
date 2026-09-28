@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, endLocalSession, SIGNED_OUT_EVENT } from './api';
+import { ACTIVE_COMPANY_KEY, TOKEN_KEY, readKey, writeKey } from './storage';
 import type { Role } from './permissions';
 
-interface SessionUser {
+export interface SessionUser {
   id: string;
   email: string;
   name: string | null;
@@ -25,6 +26,8 @@ interface AuthResponse {
 
 interface AuthContextValue {
   isAuthenticated: boolean;
+  /** The signed-in user, or null. Drives the identity in the sidebar and top bar. */
+  user: SessionUser | null;
   login: (email: string, password: string) => Promise<void>;
   register: (input: { email: string; password: string; name?: string; companyName: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -33,7 +36,12 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('runway_token'));
+  const [isAuthenticated, setIsAuthenticated] = useState(!!readKey(TOKEN_KEY));
+  // Null on a restored session until something re-reads it, because the user
+  // record is deliberately not persisted: it is fetched from the server, which
+  // is the only copy that can be trusted not to be stale. The chrome falls back
+  // to the email-free placeholder while this is null rather than inventing one.
+  const [user, setUser] = useState<SessionUser | null>(null);
 
   /**
    * Stores the session.
@@ -44,11 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * for having no company context, which reads to the user as a random failure.
    * With more than one membership the first is chosen; the switcher can change
    * it, and the server re-validates the choice on every request either way.
+   *
+   * `setIsAuthenticated(true)` is what the rest of the app keys off, and it is
+   * what unblocks `CompanyProvider`: its bootstrap used to depend only on a
+   * stable callback, so it ran exactly once per page load and never again, and
+   * every page's `if (!activeCompanyId) return` guard then short-circuited
+   * forever. Signing in inside the app left the user staring at a permanent
+   * skeleton with only a hard refresh to recover. Invisible in demo mode, which
+   * is why it survived.
    */
   const acceptSession = useCallback((res: AuthResponse) => {
-    localStorage.setItem('runway_token', res.accessToken);
+    writeKey(TOKEN_KEY, res.accessToken);
     const first = res.memberships[0];
-    if (first) localStorage.setItem('runway_active_company_id', first.companyId);
+    if (first) writeKey(ACTIVE_COMPANY_KEY, first.companyId);
+    setUser(res.user);
     setIsAuthenticated(true);
   }, []);
 
@@ -82,20 +99,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // session is cleared below; there is nothing useful to report here.
     } finally {
       endLocalSession();
+      setUser(null);
       setIsAuthenticated(false);
     }
   }, []);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ isAuthenticated, login, register, logout }),
-    [isAuthenticated, login, register, logout],
+    () => ({ isAuthenticated, user, login, register, logout }),
+    [isAuthenticated, user, login, register, logout],
   );
 
   // A refresh that fails means the session is genuinely over, wherever it is
   // noticed. Without this the UI keeps rendering as signed in with a token that
   // can no longer be used, and only the next manual navigation would reveal it.
   useEffect(() => {
-    const onSignedOut = () => setIsAuthenticated(false);
+    const onSignedOut = () => {
+      setUser(null);
+      setIsAuthenticated(false);
+    };
     window.addEventListener(SIGNED_OUT_EVENT, onSignedOut);
     return () => window.removeEventListener(SIGNED_OUT_EVENT, onSignedOut);
   }, []);

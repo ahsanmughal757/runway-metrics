@@ -452,6 +452,31 @@ describe('sessions and refresh rotation (real database)', () => {
   });
 
   describe('listing and revoking sessions', () => {
+    it('orders by activity, putting a session that has refreshed above one that has not', async () => {
+      const active = await signIn(app);
+      // Signed in later, so createdAt would put it second, and it has never
+      // refreshed, so lastUsedAt is still null.
+      const idle = await login(app, active.email);
+      const rotated = await request(app.getHttpServer())
+        .post('/api/auth/refresh')
+        .set(withCookie(active.refreshToken))
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/auth/sessions')
+        .set('Authorization', `Bearer ${idle.accessToken}`)
+        .set(withCookie(idle.refreshToken))
+        .expect(200);
+
+      // PostgreSQL sorts NULLS FIRST on `DESC`, so a plain
+      // `orderBy: { lastUsedAt: 'desc' }` puts the never-used session at the top
+      // of a list the UI labels "newest activity first".
+      const usedRow = await sessionFor(tokenFrom(rotated));
+      const idleRow = await sessionFor(idle.refreshToken);
+      expect(res.body[0].id).toBe(usedRow.id);
+      expect(res.body[0].id).not.toBe(idleRow.id);
+    });
+
     it('marks the device that is asking, so the user can tell it apart', async () => {
       const laptop = await signIn(app);
       const phone = await login(app, laptop.email);

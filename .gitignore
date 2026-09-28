@@ -5,3 +5,12 @@ build/
 .env
 *.log
 .DS_Store
+
+# Agent tooling. Carries its own node_modules and local state, none of it
+# project content.
+.opencode/
+
+# A generated dump of the source tree (imports and comments per file). It
+# goes stale the moment any file is edited, so committing it would only
+# create a second thing to keep in sync with the code it describes.
+project_context.json

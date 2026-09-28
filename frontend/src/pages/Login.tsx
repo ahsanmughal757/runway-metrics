@@ -1,6 +1,6 @@
 import type { FormEvent} from 'react';
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button, Input } from '@heroui/react';
 import { TrendingUp } from 'lucide-react';
@@ -13,10 +13,25 @@ const inputClassNames = {
   label: 'text-runway-muted',
 };
 
+/**
+ * Where to go after a successful sign-in.
+ *
+ * The route guard passes the attempted path in `state.from`, so a bookmarked or
+ * shared deep link like `/cohorts` survives the detour through `/login` instead
+ * of dumping the user on the dashboard. Falls back to `/` when there is nothing
+ * to return to - and to `/` rather than to an attacker-supplied absolute URL:
+ * only same-app paths are honoured, so this cannot be used as an open redirect.
+ */
+function destinationFrom(state: unknown): string {
+  const from = (state as { from?: unknown } | null)?.from;
+  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : '/';
+}
+
 export function Login() {
   const { login } = useAuth();
   const { push } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('demo.founder@runway.local');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -29,7 +44,7 @@ export function Login() {
     try {
       await login(email, password);
       push('Welcome back.', 'success');
-      navigate('/');
+      navigate(destinationFrom(location.state), { replace: true });
     } catch (err) {
       setError((err as Error).message);
     } finally {

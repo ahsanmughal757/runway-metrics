@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { MembershipRole, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { env } from '../config/env';
 import { AuditService } from '../audit/audit.service';
 import { slugWithSuffix } from '../common/slug';
+import { ROLE_RANK } from '../auth/permissions';
 
 export interface CompanySummary {
   id: string;
@@ -163,16 +164,23 @@ export class CompaniesRepository {
   /**
    * Changes a member's role.
    *
-   * Refuses to act on the last owner, and refuses to let an ADMIN act on an
-   * OWNER. Either mistake leaves a company that nobody can administer, which is
-   * a support incident and possibly a data-loss incident. The check and the
-   * write share a transaction so two concurrent demotions cannot both pass it.
+   * Refuses to act on the last owner, and refuses to let a non-OWNER grant a role
+   * at or above its own. Either mistake leaves a company that nobody can
+   * administer, which is a support incident and possibly a data-loss incident.
+   *
+   * Both checks live inside the transaction that performs the write, not in the
+   * controller, so two concurrent demotions cannot both pass them. The controller
+   * still checks the rank up front to return 403 without touching the database,
+   * but that check is a convenience: reading the caller's role, then acting on a
+   * membership that can change in between, is a TOCTOU window, and this
+   * transaction is the one that actually has to hold.
    */
   async updateMemberRole(
     companyId: string,
     membershipId: string,
     role: MembershipRole,
     actorId: string,
+    actorRole: MembershipRole,
   ): Promise<MemberSummary> {
     if (!env.ENABLE_DATABASE) throw new NotFoundException('Member roles cannot be changed in demo mode');
 
@@ -183,6 +191,7 @@ export class CompaniesRepository {
       });
       if (!target) throw new NotFoundException('Member not found');
 
+      assertOutranks(actorRole, role);
       if (target.role === MembershipRole.OWNER && role !== MembershipRole.OWNER) {
         throw new ConflictException('Promote another owner before changing this one');
       }
@@ -209,16 +218,34 @@ export class CompaniesRepository {
   }
 
   /**
-   * Removes a member. The caller has already been checked for
-   * `members:remove`; this enforces the owner invariant, which is a property
-   * of the tenant rather than of the caller.
+   * Removes a member.
+   *
+   * Enforces two independent rules, both inside the transaction that does the
+   * delete:
+   *
+   * 1. The caller must outrank the member being removed. `members:remove` is
+   *    granted to ADMIN as well as OWNER, and without this an ADMIN could delete
+   *    an OWNER's membership and lock the owner out of their own company. That
+   *    directly contradicted the stated intent in `auth/permissions.ts` - "ADMIN
+   *    ... cannot touch ownership, because those are the owner's to give" - which
+   *    is the kind of comment that becomes a lie if the code does not enforce
+   *    it. `PATCH /members/:id/role` checked the equivalent thing; this one
+   *    simply omitted it.
+   * 2. A company keeps at least one owner. That is a property of the tenant
+   *    rather than of the caller, which is why it is a separate check.
+   *
+   * Check (1) is the reason `actorRole` is a parameter at all. Deriving the
+   * caller's rank from the membership table would be no more authoritative than
+   * passing it, and passing it makes the authority explicit at the call site.
    */
-  async removeMember(companyId: string, membershipId: string, actorId: string): Promise<void> {
+  async removeMember(companyId: string, membershipId: string, actorId: string, actorRole: MembershipRole): Promise<void> {
     if (!env.ENABLE_DATABASE) throw new NotFoundException('Members cannot be removed in demo mode');
 
     await this.prisma.$transaction(async (tx) => {
       const target = await tx.companyMembership.findFirst({ where: { id: membershipId, companyId } });
       if (!target) throw new NotFoundException('Member not found');
+
+      assertOutranks(actorRole, target.role);
 
       if (target.role === MembershipRole.OWNER) {
         const owners = await tx.companyMembership.count({ where: { companyId, role: MembershipRole.OWNER } });
@@ -243,6 +270,27 @@ export class CompaniesRepository {
 }
 
 type CompanyRow = Prisma.CompanyGetPayload<Record<string, never>>;
+
+/**
+ * Whether `actorRole` may remove, demote, or promote a member whose role (or
+ * proposed role) is `subjectRole`.
+ *
+ * Mirrors the controller's `assertOutranks` exactly - including the OWNER
+ * exemption - so the early check and the transactional one cannot disagree
+ * about who is allowed to do what. An OWNER may act on anything, because
+ * ownership is the owner's to give and to take back.
+ *
+ * Equal rank is refused, not merely higher: an ADMIN cannot remove or
+ * overwrite a peer ADMIN. `>=` rather than `>` is what makes that true, and it is
+ * the whole reason this helper exists rather than a bare `ROLE_RANK` comparison
+ * at each call site.
+ */
+function assertOutranks(actorRole: MembershipRole, subjectRole: MembershipRole): void {
+  if (actorRole === MembershipRole.OWNER) return;
+  if (ROLE_RANK[subjectRole] >= ROLE_RANK[actorRole]) {
+    throw new ForbiddenException('You cannot act on a member at or above your own role');
+  }
+}
 
 function toSummary(c: CompanyRow): CompanySummary {
   return { id: c.id, name: c.name, slug: c.slug, currency: c.currency };

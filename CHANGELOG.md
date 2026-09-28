@@ -6,6 +6,154 @@ what the client *sees* belongs here, whether or not it is a bug fix.
 
 ## Unreleased
 
+### Fixed: a member could promote themselves above the OWNER, and demote the OWNER
+
+**Was:** `PATCH /companies/:id/members/:userId` and
+`DELETE /companies/:id/members/:userId` checked `actorRole !== 'OWNER'` and
+nothing else. A company's **ADMIN** could therefore:
+
+- promote themselves to `OWNER` (`PATCH` only checked that the target was not
+  already `OWNER`, so the new role was accepted and written);
+- demote or remove the **OWNER** entirely.
+
+Both checks ran *outside* the transaction, against a role read before it. A
+concurrent `PATCH` could also interleave between the check and the write, so even
+the OWNER-only check was not a guarantee — it was a check of a value that was
+allowed to change.
+
+**Now:** `CompaniesService.removeMember` takes `actorRole` and re-reads both
+actors' roles *inside* one transaction, and `updateMemberRole` repeats the
+proposed-role check in the same place. Both use a shared `assertOutranks` that
+throws `ForbiddenException`.
+
+The rule is rank, and it is checked against the database rather than against a
+role carried in a token:
+
+- an actor may only manage a member of strictly lower rank;
+- a member may only be assigned a role strictly below the actor's own;
+- nobody may create, alter, or remove an `OWNER` — the role exists so that
+  ownership transfer is a deliberate act, and if an ADMIN can grant it, the role
+  is decoration.
+
+Rank comparison lives in SQL (`members.role_rank < actorRank` via a `CASE`
+expression over the enum) so it cannot drift from the enum. The rejected
+alternative was re-reading the actor's role at the top of the handler and
+trusting it for the transaction's lifetime: that trusts a value another request
+can change mid-flight, which is the bug this replaces.
+
+Tests: `backend/test/db/auth.db-spec.ts`, 36 passing against a real PostgreSQL.
+
+### Fixed: the session list showed the wrong order, hiding the one you just used
+
+**Was:** the list of active sessions was ordered by `createdAt desc`, so signing
+in on a new device put it at the top. `lastUsedAt` was recorded on every request
+but never used to sort. Nothing was *wrong*, but the list is meant to answer
+"what am I signed in on, and which is this one", and the most-recently-used
+session — the one you are looking at — was not identifiable.
+
+**Now:** ordered by `lastUsedAt desc`, `nulls last` (a session that has never
+made a request still belongs at the bottom, not the top), then `createdAt desc`
+as a tiebreak so two sessions created in the same millisecond have a stable
+order.
+
+Tests: `backend/test/db/sessions.db-spec.ts`, 31 passing.
+
+### Fixed: signing in did not load the company, and the guard could not recover
+
+**Was:** `CompanyProvider`'s bootstrap effect returned early when
+`isAuthenticated` was false, on the theory that a signed-out browser has no
+tenant to load. In demo mode (`BYPASS_AUTH=true`) the app serves full fake data
+with no token, so **every** page loaded empty, with no way in.
+
+It is also not fixable from the browser's side: demo mode and signed-out are
+byte-identical to the client. Anything that infers a session from the absence of
+a token is wrong regardless of how reasonable it looks.
+
+**Now:**
+
+- the bootstrap runs unconditionally, and
+- `RequireSession` gates on `CompanyProvider.unauthorized` — a signal the
+  provider only sets when the API *rejected* the request — instead of on
+  `isAuthenticated`;
+- tenant state is cleared on the `true → false` transition of
+  `isAuthenticated` (tracked by ref, because the effect must not re-run on every
+  value) and on any `401`;
+- a network failure sets `offline`, **not** `unauthorized`, so a proxy error
+  shows "can't reach the server" rather than bouncing the user to a login page
+  for a session they still hold.
+
+The invariant, which is the thing to preserve: **the browser is never the
+authority on whether a session exists.**
+
+Test: `frontend/src/lib/CompanyContext.test.tsx` — six cases covering demo
+mode, a rejected bootstrap, an offline bootstrap, sign-in after a rejection, and
+session teardown. Restoring the old early return turns all six red.
+
+### Fixed: a failed persona switch showed the previous company's numbers
+
+**Was:** `Compare.tsx`'s persona-compare effect had no `.catch`. A failed
+persona switch left the *previous* persona's series in state while the selector
+showed the *new* one — confidently attributing another company's MRR to the
+wrong persona. Same class of bug on every page whose initial fetch had no
+failure branch: the page showed its skeleton forever, with no error and no
+retry.
+
+**Now:** every initial fetch sets a real error state and renders a shared
+`ErrorState` (it distinguishes "couldn't reach the server" from "the server
+rejected this" and offers retry). `Compare` clears its series on *every*
+persona switch, not only on success, and guards against a late response from a
+superseded switch. `Sessions.tsx` no longer claims the database is disabled for
+every failure — it says that only for the `403`/`404` that actually means demo
+mode.
+
+### Fixed: two top-bar controls were shown in modes where they do nothing
+
+**Was:** the top bar always rendered a viewpoint switcher and a "Log out" item.
+Each works in exactly one mode, and in the other it is worse than absent:
+
+- The **viewpoint switcher** sends `X-Demo-Role`, which only `BypassAuthGuard`
+  reads. Against a real session the server ignores the header and returns the
+  role from the database, so the selected tab springs back. A reviewer could
+  reasonably read that as "this is what an ADMIN sees" and be wrong — the role
+  came from the membership row, not from the control.
+- **Log out** ended a session by revoking the refresh cookie. Demo mode has no
+  session and no cookie, so the click cleared nothing: `isAuthenticated` was
+  already `false`, so the `true → false` transition the tenant-clearing effect
+  keys off never fired, and the app stayed fully populated. A sign-out that
+  visibly does not sign you out is worse than none — it implies the session
+  model works.
+
+**Now:** `GET /auth/me` returns `demo`, and each control renders only where it
+does something. The switcher is demo-only; sign-out is real-session-only.
+
+`demo` comes off the identity `BypassAuthGuard` injects and is never read from
+request input, so a real caller cannot promote itself into demo mode and turn
+on a control the server would ignore. It is threaded through `RequestUser`
+rather than read from `BYPASS_AUTH` in the service, because `auth.guard.ts` is
+documented as the only file that branches on that flag.
+
+The client cannot derive this: a healthy demo and a signed-out browser are both
+simply "no token". **The browser is never the authority on whether a session
+exists** — the same rule as the bootstrap fix above, and the reason this needed
+a server change rather than a `localStorage` check.
+
+### Fixed: no 404 route, and deep links to removed pages rendered blank
+
+**Was:** the router had no catch-all, so any unknown path rendered an empty
+outlet. `NotFound.tsx` existed and was never registered.
+
+**Now:** registered as the wildcard route.
+
+### Added: a frontend test runner
+
+`pnpm test` did not touch `frontend/` at all — every regression above shipped
+green. `frontend/` now has Vitest + Testing Library, and the root `test` script
+runs both packages. `frontend/tsconfig.json` now includes the config files,
+which is how an invalid `defaultTheme` in `tailwind.config.ts` was caught: it
+named a custom theme, but the plugin only accepts `"light" | "dark"`. No runtime
+change — `applyTheme()` selects the custom palette via the class it toggles on
+`<html>`, so the bad value was already being ignored.
+
 ### Added: rotating refresh sessions, and a logout that really logs out
 
 **Was:** `POST /auth/login` returned a 15-minute access token and nothing else.

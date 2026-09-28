@@ -19,7 +19,7 @@
     "db:seed": "pnpm --filter runway-backend run seed",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
-    "test": "pnpm --filter runway-backend run test",
+    "test": "pnpm --filter runway-backend run test && pnpm --filter runway-frontend run test",
     "test:e2e": "pnpm --filter runway-backend run test:e2e",
     "test:db": "pnpm --filter runway-backend run test:db",
     "format": "pnpm -r run format",

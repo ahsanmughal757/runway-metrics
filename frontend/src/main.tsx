@@ -10,6 +10,9 @@ import './styles/globals.css';
 import { applyTheme, getStoredTheme } from './lib/theme';
 
 // Apply the persisted theme class before first paint (dark is the default).
+// This is also what selects HeroUI's palette: `applyTheme` toggles the
+// `runwayDark`/`runwayLight` classes that the tailwind plugin emits for the
+// custom themes. `HeroUIProvider` takes no theme prop in this version.
 applyTheme(getStoredTheme());
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

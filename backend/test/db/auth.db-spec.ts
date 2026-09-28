@@ -13,6 +13,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { closeApp, freshDb, makeApp, prisma, uniqueEmail, PASSWORD, registerOwner } from './harness';
+import type { Registered } from './harness';
 
 describe('auth and tenancy', () => {
   let app: INestApplication;
@@ -253,6 +254,36 @@ describe('auth and tenancy', () => {
       expect(me.body.companyId).toBe(owner.companyId);
     });
 
+    it('does not claim a real session is a demo one, and cannot be talked into it', async () => {
+      // `/auth/me` tells the client whether this is a demo identity, which the
+      // top bar needs because two of its controls work in opposite modes. The
+      // e2e suite covers the `true` side, in demo mode; this is the `false` side,
+      // and it only exists when a real membership is resolved, so it has to live
+      // here.
+      const owner = await registerOwner(app);
+      const me = await request(server())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .set('X-Company-Id', owner.companyId)
+        .expect(200);
+
+      expect(me.body.demo).toBe(false);
+
+      // A real caller must not be able to promote itself into demo mode, which
+      // would switch on the viewpoint switcher and hand it a role header the
+      // server does not read. The flag comes off the identity the guard built,
+      // never off request input, and this is the assertion that keeps that true.
+      const forged = await request(server())
+        .get('/api/auth/me')
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .set('X-Company-Id', owner.companyId)
+        .set('X-Demo-Role', 'OWNER')
+        .expect(200);
+
+      expect(forged.body.demo).toBe(false);
+      expect(forged.body.role).toBe('OWNER');
+    });
+
     it('refuses an unknown company id rather than defaulting to one', async () => {
       const owner = await registerOwner(app);
       await request(server())
@@ -375,18 +406,23 @@ describe('auth and tenancy', () => {
         .send({ email: uniqueEmail('new'), role: 'VIEWER' });
       expect(inviteRes.status).toBe(201);
 
-      // Removing the owner is refused, with a 409 rather than a 403: the caller
-      // is allowed to do this in general, the tenant just cannot be left
-      // without an owner, and the message says what to do about it.
+      // Removing the owner is refused with a 403, not a 409. This company has a
+      // single owner, so the "keep at least one owner" invariant would also have
+      // refused it - which is exactly why this assertion used to prove nothing.
+      // It was green for the wrong reason: it could not tell an ADMIN who is not
+      // allowed to touch ownership apart from an OWNER who arrived too late to
+      // lock everyone out. Add a second owner and the 409 stops firing, and the
+      // delete went through. The rank check is the real guard; see the
+      // "member removal" block below, which tests it with the owner invariant
+      // deliberately satisfied.
       const ownerMembership = await prisma.companyMembership.findFirstOrThrow({
         where: { companyId: owner.companyId, role: 'OWNER' },
       });
-      const res = await request(server())
+      await request(server())
         .delete(`/api/companies/members/${ownerMembership.id}`)
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .set('X-Company-Id', owner.companyId)
-        .expect(409);
-      expect(res.body.message).toMatch(/owner/i);
+        .expect(403);
 
       // Promoting the admin to OWNER is refused: nobody grants their own rank.
       await request(server())
@@ -405,6 +441,139 @@ describe('auth and tenancy', () => {
         .set('X-Company-Id', viewer.companyId)
         .send({ role: 'OWNER' })
         .expect(403);
+    });
+
+    /**
+     * Member removal, tested against rank rather than the owner invariant.
+     *
+     * `removeMember` enforces two unrelated rules, and conflating them is how
+     * the privilege escalation shipped: the "keep at least one owner" check
+     * fired on a single-owner company and made the endpoint look guarded while
+     * the rank check did not exist. Every refusal case below is therefore set up
+     * so the owner invariant is **satisfied** - a second owner exists, or the
+     * target is not an owner at all. If any of these ever returns 204, the rank
+     * check is gone.
+     */
+    describe('member removal', () => {
+      type Role = 'OWNER' | 'ADMIN' | 'ANALYST' | 'VIEWER';
+
+      interface Member {
+        role: Role;
+        userId: string;
+        membershipId: string;
+        accessToken: string;
+      }
+
+      /**
+       * One company with a single OWNER plus one member per entry in `roles`.
+       *
+       * Members are created by registering them (which makes each the owner of
+       * their own throwaway company) and then re-pointing the membership,
+       * because that is the only way to obtain a real access token for a real
+       * user. The tokens keep working against the new company precisely because
+       * company and role are re-resolved from the database on every request
+       * rather than read out of the token - the same property that makes the
+       * rest of this suite meaningful.
+       */
+      async function tenant(roles: Role[]): Promise<{ owner: Registered; members: Member[] }> {
+        const owner = await registerOwner(app, uniqueEmail('owner'));
+        const members: Member[] = [];
+        for (const role of roles) {
+          const u = await registerOwner(app, uniqueEmail(role.toLowerCase()));
+          await prisma.companyMembership.deleteMany({ where: { userId: u.userId, companyId: u.companyId } });
+          const membership = await prisma.companyMembership.create({
+            data: { userId: u.userId, companyId: owner.companyId, role },
+          });
+          members.push({ role, userId: u.userId, membershipId: membership.id, accessToken: u.accessToken });
+        }
+        return { owner, members };
+      }
+
+      const remove = (actor: { accessToken: string }, companyId: string, membershipId: string) =>
+        request(server())
+          .delete(`/api/companies/members/${membershipId}`)
+          .set('Authorization', `Bearer ${actor.accessToken}`)
+          .set('X-Company-Id', companyId);
+
+      const stillMember = (membershipId: string) =>
+        prisma.companyMembership.count({ where: { id: membershipId } }).then((n) => n === 1);
+
+      it('refuses an ADMIN removing an OWNER, even when a second owner remains', async () => {
+        // The escalation. Two owners means the "keep at least one owner"
+        // invariant is satisfied and cannot be what stops this - so before the
+        // rank check, the delete succeeded and the owner's access to their own
+        // company was revoked by an admin. Stated intent, `auth/permissions.ts`:
+        // ADMIN "cannot touch ownership, because those are the owner's to give".
+        const { owner, members } = await tenant(['ADMIN', 'OWNER']);
+        const [, coOwner] = members;
+
+        const res = await remove(members[0], owner.companyId, coOwner.membershipId).expect(403);
+
+        expect(res.body.message).toMatch(/at or above your own/i);
+        // A refusal that still deleted the row would be worse than no guard.
+        expect(await stillMember(coOwner.membershipId)).toBe(true);
+      });
+
+      it('refuses an ADMIN removing a peer ADMIN', async () => {
+        // Equal rank, not merely higher. An admin who can remove their peers can
+        // clear out the whole tier above the analysts, and the audit trail is
+        // the only record afterwards.
+        const { owner, members } = await tenant(['ADMIN', 'ADMIN']);
+        const [, peer] = members;
+
+        await remove(members[0], owner.companyId, peer.membershipId).expect(403);
+        expect(await stillMember(peer.membershipId)).toBe(true);
+      });
+
+      it('lets an ADMIN remove someone below its own rank', async () => {
+        // The documented positive case: managing the team below you is the whole
+        // point of the ADMIN role, so this must keep working after the guard.
+        // 200 rather than 204 because `removeMember` resolves to void and the
+        // route declares no @HttpCode; asserting the real status keeps the test
+        // honest about what the client actually receives.
+        const { owner, members } = await tenant(['ADMIN', 'ANALYST']);
+
+        await remove(members[0], owner.companyId, members[1].membershipId).expect(200);
+        expect(await stillMember(members[1].membershipId)).toBe(false);
+      });
+
+      it('lets an OWNER remove an ADMIN, and remove a co-owner while one remains', async () => {
+        // Ownership is the owner's to give and to take back, so an OWNER is not
+        // outranked by anything in the table.
+        const { owner, members } = await tenant(['ADMIN', 'OWNER']);
+
+        await remove(owner, owner.companyId, members[0].membershipId).expect(200);
+        expect(await stillMember(members[0].membershipId)).toBe(false);
+
+        // Still two owners before this, so the invariant is satisfied again.
+        await remove(owner, owner.companyId, members[1].membershipId).expect(200);
+        expect(await stillMember(members[1].membershipId)).toBe(false);
+      });
+
+      it('refuses an OWNER removing the last remaining owner, and says what to do', async () => {
+        // The tenant invariant rather than a rank rule, so 409 with actionable
+        // wording: the caller is allowed to do this in general, the company just
+        // cannot be left unadministered, and a constraint violation could not
+        // carry the instruction.
+        const owner = await registerOwner(app, uniqueEmail('solo'));
+        const ownerMembership = await prisma.companyMembership.findFirstOrThrow({
+          where: { companyId: owner.companyId, role: 'OWNER' },
+        });
+
+        const res = await remove(owner, owner.companyId, ownerMembership.id).expect(409);
+        expect(res.body.message).toMatch(/at least one owner/i);
+        expect(await stillMember(ownerMembership.id)).toBe(true);
+      });
+
+      it('leaves an ANALYST unable to remove anyone, whatever their rank', async () => {
+        // ANALYST does not hold `members:remove` at all, so this is the
+        // permission layer rather than the rank layer - included because the
+        // two are independent and a future edit to either could silently
+        // restore the other.
+        const { owner, members } = await tenant(['ANALYST', 'VIEWER']);
+        await remove(members[0], owner.companyId, members[1].membershipId).expect(403);
+        expect(await stillMember(members[1].membershipId)).toBe(true);
+      });
     });
 
     it('refuses metric writes to a viewer but allows an analyst', async () => {

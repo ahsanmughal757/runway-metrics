@@ -4,6 +4,7 @@ import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
 import { api } from '../lib/api';
 import { ChartCardSkeleton } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 
 interface CompanySettings {
   id: string;
@@ -22,13 +23,28 @@ export function Settings() {
   const { activeCompanyId, role, can } = useCompany();
   const { push } = useToast();
   const [settings, setSettings] = useState<CompanySettings | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const canEdit = can('company:update');
 
   useEffect(() => {
     if (!activeCompanyId) return;
-    api.get<CompanySettings>('/companies/settings').then(setSettings);
-  }, [activeCompanyId, role]);
+    let cancelled = false;
+    setSettings(null);
+    setError(null);
+    api
+      .get<CompanySettings>('/companies/settings')
+      .then((s) => {
+        if (!cancelled) setSettings(s);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCompanyId, role, attempt]);
 
   async function save() {
     if (!settings) return;
@@ -44,6 +60,7 @@ export function Settings() {
     }
   }
 
+  if (error) return <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />;
   if (!settings) return <ChartCardSkeleton height={280} />;
 
   return (

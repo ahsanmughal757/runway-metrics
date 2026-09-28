@@ -13,6 +13,7 @@ import { useCompany } from '../lib/CompanyContext';
 import { useToast } from '../lib/ToastContext';
 import type { DashboardResponse, Snapshot } from '../lib/types';
 import { TableSkeleton } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 import { chartColors } from '../components/charts/chartTheme';
 
 const CSV_COLUMNS = [
@@ -70,6 +71,7 @@ export function Metrics() {
   const { activeCompanyId, role, can } = useCompany();
   const { push } = useToast();
   const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [editing, setEditing] = useState<{ month: string; field: EditableField } | null>(null);
@@ -79,13 +81,36 @@ export function Metrics() {
 
   useEffect(() => {
     if (!activeCompanyId) return;
+    let cancelled = false;
     setSnapshots(null);
-    api.get<DashboardResponse>('/metrics/dashboard').then((d) => setSnapshots(d.snapshots));
+    setError(null);
+    api
+      .get<DashboardResponse>('/metrics/dashboard')
+      .then((d) => {
+        if (!cancelled) setSnapshots(d.snapshots);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) setError(e);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [activeCompanyId, role]);
 
+  /**
+   * Re-reads the snapshots after a mutation. Deliberately not the retry path for
+   * the initial load: a failure here means the write succeeded and the refresh
+   * did not, so the table is stale in a way the editor's error toast would
+   * otherwise hide. Failures are reported rather than swallowed.
+   */
   async function reload() {
-    const d = await api.get<DashboardResponse>('/metrics/dashboard');
-    setSnapshots(d.snapshots);
+    try {
+      const d = await api.get<DashboardResponse>('/metrics/dashboard');
+      setSnapshots(d.snapshots);
+      setError(null);
+    } catch (e) {
+      setError(e);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -244,7 +269,8 @@ export function Metrics() {
           )}
         </div>
         <div className="relative px-4 pb-4">
-          {snapshots === null && <TableSkeleton rows={6} />}
+          {error !== null && <ErrorState error={error} onRetry={() => void reload()} />}
+          {snapshots === null && !error && <TableSkeleton rows={6} />}
           {snapshots !== null && (
           <Table
             aria-label="Metric snapshot history"

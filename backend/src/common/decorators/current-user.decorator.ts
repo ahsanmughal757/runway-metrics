@@ -22,6 +22,22 @@ export interface RequestUser {
   companyId: string;
   role: MembershipRole;
   permissions: readonly Permission[];
+  /**
+   * Set only by BypassAuthGuard, on the identity it injects.
+   *
+   * The frontend has controls that can only work against a demo identity - the
+   * viewpoint switcher, which is answered by `X-Demo-Role` - plus one that can
+   * only work against a *real* one, the sign-out control, because demo mode has
+   * no session and no refresh cookie to revoke. Previously the client had to
+   * guess which mode it was in, and the honest-looking guesses (sniffing the
+   * `demo-user` id, or treating "no local token" as signed out) are wrong in
+   * opposite directions. The server already knows, so it says so.
+   *
+   * Never populated from request input, so it cannot be forged. Omitted rather
+   * than `false` on real identities so every existing construction site - JWT
+   * verification, membership resolution - stays valid without being edited.
+   */
+  demo?: true;
 }
 
 export function permissionsOf(user: Pick<RequestUser, 'role'>): readonly Permission[] {

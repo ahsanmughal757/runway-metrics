@@ -11,7 +11,7 @@ import { NotificationsBell } from './NotificationsBell';
 import { DataAsOf } from './DataAsOf';
 
 export function TopBar() {
-  const { companies, activeCompanyId, setActiveCompanyId, role, setRole } = useCompany();
+  const { companies, activeCompanyId, setActiveCompanyId, role, setRole, demo } = useCompany();
   const navigate = useNavigate();
   const auth = useAuth();
   const [dark, setDark] = useState(() => getStoredTheme() === 'dark');
@@ -24,9 +24,38 @@ export function TopBar() {
     applyTheme(next, true);
   }
 
-function handleLogout() {
-  void auth.logout();
-}
+  function handleLogout() {
+    void auth.logout();
+  }
+
+  // Built as an array rather than written inline as JSX children. HeroUI types a
+  // collection's children as `CollectionElement`, which admits neither `false`
+  // nor a JSX comment - so a conditional item, and even the comment explaining
+  // it, are type errors there. The rejected alternatives were `demo ? <Item/> :
+  // null`, which the same type also rejects, and hiding the item behind
+  // `disabled`, which leaves a control in the menu that does nothing.
+  //
+  // "Log out" is gated on the inverse of the viewpoint toggle, and for the
+  // opposite reason: `logout()` ends a session by revoking the refresh cookie,
+  // and demo mode has no session and no cookie - so the click clears nothing,
+  // `isAuthenticated` was already false, and the app stays fully populated. A
+  // sign-out that visibly does not sign you out is worse than none, because it
+  // implies the session model works when it does not.
+  const accountActions = [
+    <DropdownItem key="profile" startContent={<UserRound size={14} />} onPress={() => navigate('/settings')}>
+      Profile
+    </DropdownItem>,
+    <DropdownItem key="workspace" startContent={<Building2 size={14} />} onPress={() => navigate('/settings')}>
+      Workspace
+    </DropdownItem>,
+    ...(!demo
+      ? [
+          <DropdownItem key="logout" startContent={<LogOut size={14} />} className="text-runway-negative" onPress={handleLogout}>
+            Log out
+          </DropdownItem>,
+        ]
+      : []),
+  ];
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-3 bg-runway-bg/60 backdrop-blur-xl border-b border-runway-border/60">
@@ -70,24 +99,34 @@ function handleLogout() {
 
         {/* Demo-only viewpoint toggle. The server re-derives permissions from
             whichever role is assumed, so this cannot show a capability the real
-            product would refuse - see auth/bypass-auth.guard.ts. */}
-        <Tabs
-          aria-label="Viewpoint"
-          size="sm"
-          selectedKey={role}
-          onSelectionChange={(key) => setRole(key as Role)}
-          color="primary"
-          variant="solid"
-          classNames={{
-            tabList: 'bg-white/[0.03] border border-runway-border/70 rounded-xl p-1',
-            tab: 'text-runway-muted data-[selected=true]:text-white rounded-lg text-xs',
-            cursor: 'bg-accent-gradient shadow-glow',
-          }}
-        >
-          {ROLES.map((r) => (
-            <Tab key={r} title={ROLE_LABELS[r]} />
-          ))}
-        </Tabs>
+            product would refuse - see auth/bypass-auth.guard.ts.
+
+            Hidden outside demo mode rather than disabled, and that is the point.
+            `X-Demo-Role` is read by BypassAuthGuard alone, so against a real
+            session the server ignores it and returns the real role: the tab you
+            clicked springs back. Left visible, it is a role selector that a
+            reviewer could reasonably read as "this is what ADMIN sees" - and in a
+            real deployment the answer is that the role came from the database,
+            not from this control. */}
+        {demo && (
+          <Tabs
+            aria-label="Viewpoint"
+            size="sm"
+            selectedKey={role}
+            onSelectionChange={(key) => setRole(key as Role)}
+            color="primary"
+            variant="solid"
+            classNames={{
+              tabList: 'bg-white/[0.03] border border-runway-border/70 rounded-xl p-1',
+              tab: 'text-runway-muted data-[selected=true]:text-white rounded-lg text-xs',
+              cursor: 'bg-accent-gradient shadow-glow',
+            }}
+          >
+            {ROLES.map((r) => (
+              <Tab key={r} title={ROLE_LABELS[r]} />
+            ))}
+          </Tabs>
+        )}
 
         <NotificationsBell />
         <DataAsOf />
@@ -118,15 +157,7 @@ function handleLogout() {
             className="bg-runway-raised border border-runway-borderStrong rounded-xl text-runway-text"
             itemClasses={{ base: 'data-[hover=true]:bg-white/[0.04] rounded-lg' }}
           >
-            <DropdownItem key="profile" startContent={<UserRound size={14} />} onPress={() => navigate('/settings')}>
-              Profile
-            </DropdownItem>
-            <DropdownItem key="workspace" startContent={<Building2 size={14} />} onPress={() => navigate('/settings')}>
-              Workspace
-            </DropdownItem>
-            <DropdownItem key="logout" startContent={<LogOut size={14} />} className="text-runway-negative" onPress={handleLogout}>
-              Log out
-            </DropdownItem>
+            {accountActions}
           </DropdownMenu>
         </Dropdown>
       </div>

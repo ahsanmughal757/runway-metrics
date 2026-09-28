@@ -35,6 +35,11 @@ export class BypassAuthGuard implements CanActivate {
       companyId: KNOWN_DEMO_COMPANIES.has(requestedCompany) ? requestedCompany : 'demo-company-steady',
       role,
       permissions: permissionsForRole(role),
+      // Tells the client this identity is a demo one. Set here rather than read
+      // from `env` in the service, because auth.guard.ts is the only file
+      // allowed to branch on BYPASS_AUTH, and /auth/me reaches the same fact
+      // through the identity this guard built.
+      demo: true,
     };
     return true;
   }
