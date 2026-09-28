@@ -2,6 +2,8 @@
 
 An investor-grade metrics dashboard for founders that produces polished PDF investor updates.
 
+<img width="1921" height="2515" alt="image" src="https://github.com/user-attachments/assets/8bfbccd4-72c5-4eb4-a86b-56e8e00a01a0" />
+
 ## Tech Stack
 
 | Technology | Purpose |
