@@ -1,10 +1,16 @@
 # Phase 4 — credential encryption and real API keys
 
-**Status:** not started
+**Status:** complete — `4327a34` "Encrypt share-link tokens and add API keys that
+authenticate"
 **Depends on:** Phase 3c
 **Breadcrumbs in the tree:** `scripts/generate-secrets.mjs:17`,
-`backend/src/config/env.ts:116-117, 142-148`,
-`backend/test/env.spec.ts:131`, `backend/src/common/logging/redaction.ts:29`
+`backend/src/config/env.ts` (`it encrypts share-link tokens and any connector
+credential added later`), `backend/test/env.spec.ts`,
+`backend/src/common/logging/redaction.ts:29`
+
+This doc is archived. Nothing here is a to-do. The section that matters most now
+is **What each decision is pinned by** at the bottom — that is what stops a
+future reader from "simplifying" a choice back and shipping the bug again.
 
 ## The problem this phase exists to solve
 
@@ -281,3 +287,32 @@ at all.
       Two entries: the plaintext share-token fix and the API keys.
 - [x] The `env.ts` message, which promised a capability in the future tense, is
       updated — and every other phase breadcrumb is re-grepped for accuracy.
+
+## What each decision is pinned by
+
+The point of archiving this doc is not the prose. It is that every decision
+below was argued, and each one has a test that fails if the decision is
+reversed. **If you change one of these, the corresponding test will fail, and
+that failure is the argument — read it before you "fix" it.**
+
+| Decision | Pinned by |
+|---|---|
+| A share token is stored as a sha256 hash *and* GCM ciphertext, not either alone | `share.controller` e2e/db coverage plus `credential-crypto.service.spec.ts` — hash-only cannot re-display, ciphertext-only cannot be a `findUnique` |
+| The crypto binds a fixed AAD context string (`share-link-token`) and the tenant is enforced by the `findUnique({ tokenHash })` | `credential-crypto.service.spec.ts` — "rejects a ciphertext replayed under a different context" |
+| A tampered or truncated envelope throws rather than returning garbage | `credential-crypto.service.spec.ts` — the four tamper cases and the four malformed-input cases |
+| A retired key id fails loudly, with rotation instructions, rather than falling back | `credential-crypto.service.spec.ts` — "refuses to decrypt under a key id it no longer holds" |
+| A key of the wrong length is rejected at boot, not at first use | `backend/test/env.spec.ts` — the 63-character and 64-character-non-hex cases |
+| A key secret is returned exactly once and never stored in the clear | `backend/test/db/api-keys.db-spec.ts` — "never writes the secret it returned", and `JSON.stringify(row)` not containing it |
+| A key may hold any permission **except** `apiKeys:manage` | `api-keys.db-spec.ts` — the HTTP 403 **and** a raw `prisma.apiKey.create` rejected by the `ApiKey_scopes_known` CHECK, so the rule holds even against code that bypasses the service |
+| ADMIN may issue keys as well as OWNER — deliberate, and the rejected alternative is OWNER-only | `api-keys.db-spec.ts` — "an ADMIN can issue a key, and it works" |
+| A key is a machine identity: no `userId`, `role: 'VIEWER'`, labelled by `apiKeyId` | `PermissionsGuard` change plus the audit assertions in `api-keys.db-spec.ts`; the reasoning is in `current-user.decorator.ts` |
+| Unknown, revoked and expired keys return one identical 401 | `api-keys.db-spec.ts` — "gives the same answer for a wrong secret as for a revoked one" |
+| A key cannot reach another tenant, and `X-Company-Id` cannot redirect it | `api-keys.db-spec.ts` — the tenancy group, including the cross-company header case |
+| `ApiKeysModule` and `AuditModule` are `@Global()`, and there is no `forwardRef` left | No test can pin this; it is a boot-time fact, and `backend/src/api-keys/api-keys.module.ts` explains the `forwardRef` trap it replaced |
+| A pending (`pending:`) ciphertext is never served | `src/scripts/reencrypt-share-tokens.ts` — operator runbook, plus the migration comment that says why the rewrite cannot happen in SQL |
+
+Run the re-encrypt pass with:
+
+```
+pnpm --filter runway-backend exec tsx src/scripts/reencrypt-share-tokens.ts
+```

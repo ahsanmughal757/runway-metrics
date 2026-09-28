@@ -29,7 +29,7 @@ Do not start a new phase without confirming phases before it are done.
 | 3a | Rotating refresh sessions, httpOnly cookie, reuse detection, devices | **done** (`9abf406`) | [archive/phases-1-3b.md](archive/phases-1-3b.md) |
 | 3b | CAS token claim, fixes the simultaneous-refresh race | **done** (`8adb097`) | [archive/phases-1-3b.md](archive/phases-1-3b.md) |
 | **3c** | **Regressions in shipped phases** | **done** (`2630072`) | [archive/phase-3c-regressions.md](archive/phase-3c-regressions.md) |
-| 4 | Credential encryption (AES-256-GCM) + real API keys | **in progress** | [phase-4-credential-encryption.md](phase-4-credential-encryption.md) |
+| 4 | Credential encryption (AES-256-GCM) + real API keys | **done** (`4327a34`) | [archive/phase-4-credential-encryption.md](archive/phase-4-credential-encryption.md) |
 | 5 | Frontend data layer | not started | [phase-5-frontend-data-layer.md](phase-5-frontend-data-layer.md) |
 | 6 | CI, deploy, observability | not started | [phase-6-ci-deploy-observability.md](phase-6-ci-deploy-observability.md) |
 
@@ -37,13 +37,20 @@ Phase 3c was a late insertion. Phases 1–3b shipped with defects that were only
 found by auditing them afterwards — one of them a privilege escalation. It ran
 before Phase 4, and moved to `archive/` once its checklist was ticked.
 
-## Why phases 1–3b are in `archive/`
+**Next up is Phase 5** (frontend data layer). It is blocked by one open
+decision — TanStack Query or a hand-rolled `useResource` — and that should be
+settled in the phase doc before any code is written.
 
-Phases 1–3b are complete, so their detail is history. But the *reasoning* is
-not: the tests that pin each fix are the only thing preventing those bugs from
-quietly coming back. `archive/phases-1-3b.md` records what each phase
-established and **which test guards it**, so the next reader does not
-"clean up" a test without learning what it is for.
+## Why completed phases go in `archive/`
+
+A completed phase's detail is history, but the *reasoning* is not: the tests
+that pin each fix are the only thing preventing those bugs from quietly coming
+back. `archive/phases-1-3b.md` records what each of those phases established
+and **which test guards it**. `archive/phase-4-credential-encryption.md` does
+the same in a table, because that phase's decisions are exactly the kind a
+future reader would "simplify" back — encrypt-only share tokens, OWNER-only key
+issuance, a scope list that includes `apiKeys:manage`. Read the guard table
+before changing one of those.
 
 ## How this folder is maintained
 
@@ -90,4 +97,12 @@ Block the phases listed, and only those.
 | Deployment target: nginx + compose on a VPS, or a managed host (Fly/Render/Cloud Run)? | Phase 6 | no |
 | Frontend data layer: TanStack Query, or a hand-rolled `useResource` hook? | Phase 5 | no |
 
-Phase 3c and Phase 4 do not depend on either answer.
+Neither question blocked Phase 3c or Phase 4, which is a fact about those
+phases rather than luck. **Phase 5 does depend on its own answer** — the choice
+determines whether the thirteen outstanding `react-hooks/set-state-in-effect`
+warnings get fixed by adopting a library or by restructuring the pages, so
+settle it in `phase-5-frontend-data-layer.md` before writing code.
+
+There is no Phase 7. An earlier revision of this conversation referred to a
+"visual refresh" phase; it was never written down here, so it is not planned
+work. Raise it as a new phase if it is wanted.
