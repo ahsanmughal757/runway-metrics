@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
   Button,
@@ -7,11 +8,13 @@ import {
   Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
   Table, TableHeader, TableColumn, TableBody, TableRow, TableCell,
 } from '@heroui/react';
-import { KeyRound, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Lock, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../lib/ToastContext';
 import { api, ApiError } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
+import { companyKeys } from '../lib/queryKeys';
 import { ErrorState } from '../components/ErrorState';
+import { EmptyState } from '../components/EmptyState';
 import { TableSkeleton } from '../components/Skeleton';
 
 interface ApiKeySummary {
@@ -58,70 +61,105 @@ const SCOPE_LABELS: Record<string, string> = {
 export function ApiKeys() {
   const { push } = useToast();
   const { can, activeCompanyId } = useCompany();
+  const queryClient = useQueryClient();
   const canManage = can('apiKeys:manage');
 
-  const [keys, setKeys] = useState<ApiKeySummary[] | null>(null);
-  const [error, setError] = useState<unknown>(null);
-  const [attempt, setAttempt] = useState(0);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [scopes, setScopes] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
   const [revoking, setRevoking] = useState<ApiKeySummary | null>(null);
   /** The one and only time the secret exists in the browser. */
   const [fresh, setFresh] = useState<CreatedKey | null>(null);
 
-  useEffect(() => {
-    if (!canManage || !activeCompanyId) {
-      // Nothing to fetch and nothing honest to show. The absence of the table
-      // is the permission being enforced, not a failure to load.
-      setKeys([]);
-      return;
-    }
-    let cancelled = false;
-    setKeys(null);
-    setError(null);
-    api
-      .get<ApiKeySummary[]>('/companies/api-keys')
-      .then((rows) => {
-        if (!cancelled) setKeys(rows);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCompanyId, attempt, canManage]);
+  const { data: keys, isPending, isError, error, refetch } = useQuery({
+    queryKey: companyKeys.apiKeys(activeCompanyId),
+    queryFn: ({ signal }) => api.get<ApiKeySummary[]>('/companies/api-keys', signal),
+    // The list is `apiKeys:manage` on the server, so a role without it could
+    // only ever earn a 403. The permission is that viewer's answer, not a load
+    // that failed, and not firing keeps the two apart.
+    enabled: activeCompanyId !== null && canManage,
+  });
 
-  async function createKey() {
-    setSubmitting(true);
-    try {
-      const created = await api.post<CreatedKey>('/companies/api-keys', { name, scopes });
-      setKeys((prev) => [created.key, ...(prev ?? [])]);
+  // No `signal` on either mutation: `useMutation` hands out no abort signal and
+  // does not cancel on unmount, and it does not need to. A mutation writes to the
+  // cache rather than to component state, so a response that lands after the
+  // page has gone updates an entry nobody is rendering yet rather than
+  // resurrecting a dead one.
+  const createKey = useMutation({
+    mutationFn: (input: { companyId: string; name: string; scopes: string[] }) =>
+      api.post<CreatedKey>('/companies/api-keys', { name: input.name, scopes: input.scopes }),
+    onSuccess: (created, { companyId }) => {
+      // Only the summary goes into the cache. The secret stays in the `fresh`
+      // state above, because a cache entry outlives the component that wrote it
+      // and is the one place a live credential could be read back out of by
+      // something other than the modal deliberately showing it once.
+      queryClient.setQueryData<ApiKeySummary[]>(companyKeys.apiKeys(companyId), (prev) =>
+        prev ? [created.key, ...prev] : [created.key],
+      );
       setCreating(false);
       setName('');
       setScopes([]);
       setFresh(created);
-    } catch (e) {
+    },
+    onError: (e: unknown) => {
       push(e instanceof ApiError ? e.message : 'The key could not be created.', 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    },
+  });
 
-  async function revokeKey(row: ApiKeySummary) {
-    try {
-      await api.del(`/companies/api-keys/${row.id}`);
-      setKeys((prev) => (prev ?? []).map((k) => (k.id === row.id ? { ...k, isRevoked: true, revokedAt: new Date().toISOString() } : k)));
+  const revokeKey = useMutation({
+    // The company travels in the variables although it is not in the URL: the
+    // cache entry it invalidates is tenant-scoped, and a company switch between
+    // the click and the response must not re-read the wrong company's keys.
+    mutationFn: (input: { companyId: string; row: ApiKeySummary }) => api.del(`/companies/api-keys/${input.row.id}`),
+    onSuccess: (_result, { companyId, row }) => {
+      // The endpoint answers `{ revoked: true }` and not the updated row, so
+      // there is no server state to write. The old code stamped `revokedAt` from
+      // the browser clock, which is a fact about the browser and not about the
+      // key: an operator reading it would be told when *this machine* decided,
+      // which can be hours away from when the credential actually died.
+      void queryClient.invalidateQueries({ queryKey: companyKeys.apiKeys(companyId) });
       setRevoking(null);
       push(`${row.name} revoked.`, 'success');
-    } catch (e) {
+    },
+    onError: (e: unknown) => {
       // Not swallowed into the table: a revocation that silently fails leaves
-      // the operator believing a leaked key is dead.
+      // the operator believing a leaked key is dead. The dialog stays open for
+      // the same reason - the row it is about is still live.
       push(e instanceof ApiError ? e.message : 'The key could not be revoked.', 'error');
-    }
+    },
+  });
+
+  // A disabled query is pending for as long as the page is open, so `isPending`
+  // is only a real load once both gates above are open. The company and the
+  // permission are checked first for that reason, and the company first again
+  // because it is what narrows the id to a `string` the two mutations above can
+  // be told about.
+  if (activeCompanyId === null) return <TableSkeleton rows={3} />;
+  // The old effect wrote an empty list for a role without the permission, which
+  // rendered "No keys yet." - a viewer with keys was told they had none. A
+  // permission is not a load that came back empty, and the page has to say which
+  // of the two it is.
+  if (!canManage) {
+    return (
+      <EmptyState
+        icon={Lock}
+        title="You cannot manage API keys"
+        description="Issuing and revoking keys needs the Manage API keys permission, which is not part of any role below Founder. Ask one to create the key for you."
+      />
+    );
   }
+  if (isPending) return <TableSkeleton rows={3} />;
+  if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
+  if (!keys) return <ErrorState error={new Error('The API keys did not load.')} />;
+
+  const submitCreate = () => {
+    createKey.mutate({ companyId: activeCompanyId, name, scopes });
+  };
+
+  const confirmRevoke = () => {
+    if (!revoking) return;
+    revokeKey.mutate({ companyId: activeCompanyId, row: revoking });
+  };
 
   const SCOPES = Object.entries(SCOPE_LABELS).filter(([scope]) => scope !== 'apiKeys:manage');
 
@@ -140,8 +178,6 @@ export function ApiKeys() {
         </p>
       </motion.div>
 
-      {error !== null && <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />}
-
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <div className="runway-card overflow-hidden">
           <div className="runway-sheen" />
@@ -157,70 +193,66 @@ export function ApiKeys() {
             )}
           </div>
           <div className="relative px-4 pb-4">
-            {keys === null && !error ? (
-              <TableSkeleton rows={3} />
-            ) : (
-              <Table
-                aria-label="API keys"
-                removeWrapper
-                classNames={{
-                  th: 'bg-transparent text-runway-muted text-[11px] uppercase tracking-wider',
-                  td: 'text-runway-text py-3',
-                  tr: 'border-b border-runway-border/50 last:border-0',
-                }}
-              >
-                <TableHeader>
-                  <TableColumn>NAME</TableColumn>
-                  <TableColumn>KEY</TableColumn>
-                  <TableColumn>SCOPES</TableColumn>
-                  <TableColumn>CREATED</TableColumn>
-                  <TableColumn>LAST USED</TableColumn>
-                  <TableColumn align="end">ACTIONS</TableColumn>
-                </TableHeader>
-                <TableBody emptyContent="No keys yet." items={keys ?? []}>
-                  {(k) => (
-                    <TableRow key={k.id} className={k.isRevoked ? 'opacity-50' : undefined}>
-                      <TableCell className="font-medium">
-                        {k.name}
-                        {k.isRevoked && <span className="ml-2 text-[10px] uppercase tracking-wider text-runway-negative">revoked</span>}
-                        {k.expiresAt && !k.isRevoked && (
-                          <span className="block text-[11px] text-runway-muted">expires {date(k.expiresAt)}</span>
+          <Table
+              aria-label="API keys"
+              removeWrapper
+              classNames={{
+                th: 'bg-transparent text-runway-muted text-[11px] uppercase tracking-wider',
+                td: 'text-runway-text py-3',
+                tr: 'border-b border-runway-border/50 last:border-0',
+              }}
+            >
+              <TableHeader>
+                <TableColumn>NAME</TableColumn>
+                <TableColumn>KEY</TableColumn>
+                <TableColumn>SCOPES</TableColumn>
+                <TableColumn>CREATED</TableColumn>
+                <TableColumn>LAST USED</TableColumn>
+                <TableColumn align="end">ACTIONS</TableColumn>
+              </TableHeader>
+              <TableBody emptyContent="No keys yet." items={keys}>
+                {(k) => (
+                  <TableRow key={k.id} className={k.isRevoked ? 'opacity-50' : undefined}>
+                    <TableCell className="font-medium">
+                      {k.name}
+                      {k.isRevoked && <span className="ml-2 text-[10px] uppercase tracking-wider text-runway-negative">revoked</span>}
+                      {k.expiresAt && !k.isRevoked && (
+                        <span className="block text-[11px] text-runway-muted">expires {date(k.expiresAt)}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <code className="text-xs text-runway-muted bg-white/[0.03] border border-runway-border/60 rounded-md px-2 py-1">
+                        {k.prefix}…
+                      </code>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {k.scopes.map((s) => (
+                          <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-runway-muted">
+                            {SCOPE_LABELS[s] ?? s}
+                          </span>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-runway-muted text-xs whitespace-nowrap">{date(k.createdAt)}</TableCell>
+                    <TableCell className="text-runway-muted text-xs whitespace-nowrap">{k.lastUsedAt ? date(k.lastUsedAt) : 'Never'}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end">
+                        {/* No "regenerate": a secret cannot be re-read, so
+                            regenerating would mean minting a replacement and
+                            silently leaving the old key live. Revoke, then
+                            create, and make the operator do both. */}
+                        {!k.isRevoked && canManage && (
+                          <Button size="sm" variant="light" color="danger" startContent={<Trash2 size={13} />} onPress={() => setRevoking(k)}>
+                            Revoke
+                          </Button>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-xs text-runway-muted bg-white/[0.03] border border-runway-border/60 rounded-md px-2 py-1">
-                          {k.prefix}…
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {k.scopes.map((s) => (
-                            <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.04] text-runway-muted">
-                              {SCOPE_LABELS[s] ?? s}
-                            </span>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-runway-muted text-xs whitespace-nowrap">{date(k.createdAt)}</TableCell>
-                      <TableCell className="text-runway-muted text-xs whitespace-nowrap">{k.lastUsedAt ? date(k.lastUsedAt) : 'Never'}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          {/* No "regenerate": a secret cannot be re-read, so
-                              regenerating would mean minting a replacement and
-                              silently leaving the old key live. Revoke, then
-                              create, and make the operator do both. */}
-                          {!k.isRevoked && canManage && (
-                            <Button size="sm" variant="light" color="danger" startContent={<Trash2 size={13} />} onPress={() => setRevoking(k)}>
-                              Revoke
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </motion.div>
@@ -257,7 +289,7 @@ export function ApiKeys() {
             <Button size="sm" variant="light" onPress={() => setCreating(false)}>
               Cancel
             </Button>
-            <Button size="sm" color="primary" className="bg-accent-gradient" isDisabled={name.trim() === '' || scopes.length === 0} isLoading={submitting} onPress={() => void createKey()}>
+            <Button size="sm" color="primary" className="bg-accent-gradient" isDisabled={name.trim() === '' || scopes.length === 0} isLoading={createKey.isPending} onPress={submitCreate}>
               Create key
             </Button>
           </ModalFooter>
@@ -303,7 +335,7 @@ export function ApiKeys() {
             <Button size="sm" variant="light" onPress={() => setRevoking(null)}>
               Cancel
             </Button>
-            <Button size="sm" color="danger" onPress={() => revoking && void revokeKey(revoking)}>
+            <Button size="sm" color="danger" onPress={confirmRevoke}>
               Revoke
             </Button>
           </ModalFooter>

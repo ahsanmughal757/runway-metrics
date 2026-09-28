@@ -95,6 +95,18 @@ The README already justifies why `test:db` exists. This phase makes CI run it.
   demo password non-defaultable rather than a constant.
 - Confirm the migration story for the Phase 4 `ApiKey` table and the Phase 3
   session columns on a real Postgres, in CI, on every push.
+- **Ship `reencrypt-share-tokens` as a deploy step, or every existing share link
+  dies silently.** Carried over from Phase 4. The Phase 4 migration hashes
+  existing `ShareLink.token` values and writes `tokenCiphertext` with a `pending:`
+  marker rather than encrypting in the migration (encrypting there would commit
+  the master key to git). Until
+  `pnpm --filter runway-backend exec tsx src/scripts/reencrypt-share-tokens.ts`
+  runs against a real database, **every share link created before that deploy is
+  unrecoverable** — `resolve()` reads `tokenCiphertext`, finds the marker, and
+  refuses. Nothing logs loudly, no migration is pending, and the failure only
+  shows up as a dead URL handed to an investor. Make it part of the deploy
+  sequence, and add a startup check that a non-zero number of `pending:` rows
+  after the script is a deploy failure rather than a warning.
 
 ## 6-4 — the serving layer
 

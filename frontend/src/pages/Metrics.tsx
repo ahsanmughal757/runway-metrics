@@ -1,5 +1,6 @@
 import type { FormEvent} from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button, Input,
   Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
@@ -14,6 +15,7 @@ import { useToast } from '../lib/ToastContext';
 import type { DashboardResponse, Snapshot } from '../lib/types';
 import { TableSkeleton } from '../components/Skeleton';
 import { ErrorState } from '../components/ErrorState';
+import { companyKeys } from '../lib/queryKeys';
 import { chartColors } from '../components/charts/chartTheme';
 
 const CSV_COLUMNS = [
@@ -68,112 +70,150 @@ const editableFields: { key: EditableField; label: string; numeric: boolean }[] 
 ];
 
 export function Metrics() {
-  const { activeCompanyId, role, can } = useCompany();
+  const { activeCompanyId, can } = useCompany();
   const { push } = useToast();
-  const [snapshots, setSnapshots] = useState<Snapshot[] | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
-  const [submitting, setSubmitting] = useState(false);
   const [editing, setEditing] = useState<{ month: string; field: EditableField } | null>(null);
   const [editValue, setEditValue] = useState('');
   const [deleting, setDeleting] = useState<Snapshot | null>(null);
   const canEdit = can('metrics:write');
 
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    let cancelled = false;
-    setSnapshots(null);
-    setError(null);
-    api
-      .get<DashboardResponse>('/metrics/dashboard')
-      .then((d) => {
-        if (!cancelled) setSnapshots(d.snapshots);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCompanyId, role]);
+  // `role` was a dependency of the old effect and is not one here. Which
+  // snapshots exist and what they say is the same whoever is looking at them;
+  // only what the buttons are allowed to do depends on the viewer, and that is
+  // read at render above. Re-reading the series on a persona switch fetched
+  // identical data and was the other half of a last-write-wins race against the
+  // request already in flight.
+  const { data, isPending, isError, error, refetch } = useQuery({
+    queryKey: companyKeys.dashboard(activeCompanyId),
+    queryFn: ({ signal }) => api.get<DashboardResponse>('/metrics/dashboard', signal),
+    // No company, no request. See the rule in `queryKeys.ts`.
+    enabled: activeCompanyId !== null,
+  });
 
   /**
-   * Re-reads the snapshots after a mutation. Deliberately not the retry path for
-   * the initial load: a failure here means the write succeeded and the refresh
-   * did not, so the table is stale in a way the editor's error toast would
-   * otherwise hide. Failures are reported rather than swallowed.
+   * What every write below does on success, and why it is not a `setQueryData`.
+   * A snapshot's `derived` block is computed by the server across the whole
+   * series, so changing March's MRR moves runway and NRR on every month after it.
+   * Patching the one row this page changed would publish numbers the backend
+   * never produced, and hold them until a later refetch happened to disagree.
+   *
+   * The company id is a parameter rather than read off the render, because the
+   * invalidation has to address the company the write was made *against*. Reading
+   * `activeCompanyId` in `onSuccess` would address whichever company is on screen
+   * when the response lands, which after a company switch means refetching the
+   * wrong tenant's numbers.
    */
-  async function reload() {
-    try {
-      const d = await api.get<DashboardResponse>('/metrics/dashboard');
-      setSnapshots(d.snapshots);
-      setError(null);
-    } catch (e) {
-      setError(e);
-    }
-  }
+  const invalidateDashboard = (companyId: string) => {
+    void queryClient.invalidateQueries({ queryKey: companyKeys.dashboard(companyId) });
+  };
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await api.post('/metrics/snapshot', {
-        month: `${form.month}-01`,
-        mrr: Number(form.mrr), newMrr: Number(form.newMrr), expansionMrr: Number(form.expansionMrr),
-        contractionMrr: Number(form.contractionMrr), churnedMrr: Number(form.churnedMrr),
-        newCustomers: Number(form.newCustomers), churnedCustomers: Number(form.churnedCustomers),
-        totalCustomers: Number(form.totalCustomers), burnRate: Number(form.burnRate), cash: Number(form.cash),
-        notes: form.notes || undefined,
-      });
-      push('Snapshot saved.', 'success');
+  // No `signal`, unlike the query above: `useMutation` hands out no abort signal
+  // and does not cancel on unmount, and it does not need to. A mutation writes to
+  // the cache rather than to component state, so a response that lands after the
+  // page has gone updates an entry nobody is rendering yet rather than
+  // resurrecting a dead one.
+  const createSnapshot = useMutation({
+    mutationFn: (input: { companyId: string; form: typeof emptyForm }) =>
+      api.post('/metrics/snapshot', {
+        month: `${input.form.month}-01`,
+        mrr: Number(input.form.mrr), newMrr: Number(input.form.newMrr), expansionMrr: Number(input.form.expansionMrr),
+        contractionMrr: Number(input.form.contractionMrr), churnedMrr: Number(input.form.churnedMrr),
+        newCustomers: Number(input.form.newCustomers), churnedCustomers: Number(input.form.churnedCustomers),
+        totalCustomers: Number(input.form.totalCustomers), burnRate: Number(input.form.burnRate),
+        cash: Number(input.form.cash),
+        notes: input.form.notes || undefined,
+      }),
+    onSuccess: (_saved, { companyId }) => {
       setForm(emptyForm);
-      await reload();
-    } catch (err) {
+      push('Snapshot saved.', 'success');
+      invalidateDashboard(companyId);
+    },
+    onError: (err: unknown) => {
       push((err as Error).message, 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  }
+    },
+  });
 
-  async function saveEdit(s: Snapshot) {
-    if (!editing) return;
-    const field = editing.field;
-    const fieldInfo = editableFields.find((f) => f.key === field)!;
-    let value: string | number | undefined = editValue;
-    if (fieldInfo.numeric) value = Number(editValue);
-    if (field === 'notes' && editValue.trim() === '') value = undefined;
-
-    const payload = {
-      month: s.month.slice(0, 10),
-      mrr: s.mrr, newMrr: s.newMrr, expansionMrr: s.expansionMrr,
-      contractionMrr: s.contractionMrr, churnedMrr: s.churnedMrr,
-      newCustomers: s.newCustomers, churnedCustomers: s.churnedCustomers,
-      totalCustomers: s.totalCustomers, burnRate: s.burnRate, cash: s.cash,
-      notes: s.notes,
-      [field]: value,
-    };
-    setEditing(null);
-    try {
-      await api.post('/metrics/snapshot', payload);
+  const updateSnapshot = useMutation({
+    mutationFn: (input: { companyId: string; snapshot: Snapshot; field: EditableField; value: string }) => {
+      const s = input.snapshot;
+      const numeric = editableFields.some((f) => f.key === input.field && f.numeric);
+      // An emptied notes box means "no note" and has to go as undefined to clear
+      // the column. Sending the empty string would leave a note behind that says
+      // nothing, and the cell would read as a blank rather than reverting to the
+      // placeholder.
+      const value: string | number | undefined =
+        input.field === 'notes' && input.value.trim() === '' ? undefined : numeric ? Number(input.value) : input.value;
+      return api.post('/metrics/snapshot', {
+        month: s.month.slice(0, 10),
+        mrr: s.mrr, newMrr: s.newMrr, expansionMrr: s.expansionMrr,
+        contractionMrr: s.contractionMrr, churnedMrr: s.churnedMrr,
+        newCustomers: s.newCustomers, churnedCustomers: s.churnedCustomers,
+        totalCustomers: s.totalCustomers, burnRate: s.burnRate, cash: s.cash,
+        notes: s.notes,
+        [input.field]: value,
+      });
+    },
+    onSuccess: (_saved, { companyId }) => {
       push('Snapshot updated.', 'success');
-      await reload();
-    } catch (err) {
+      invalidateDashboard(companyId);
+    },
+    onError: (err: unknown) => {
       push((err as Error).message, 'error');
-    }
-  }
+    },
+  });
 
-  async function confirmDelete() {
+  const deleteSnapshot = useMutation({
+    mutationFn: (input: { companyId: string; month: string }) => api.del(`/metrics/snapshot/${input.month}`),
+    onSuccess: (_deleted, { companyId }) => {
+      push('Snapshot deleted.', 'success');
+      invalidateDashboard(companyId);
+    },
+    onError: (err: unknown) => {
+      push((err as Error).message, 'error');
+    },
+  });
+
+  // The company is checked before `isPending` because the query is disabled
+  // rather than fired without one, and a disabled query sits at `isPending`
+  // forever: treating that as "loading" would show a skeleton that never
+  // resolves, and would leave `activeCompanyId` as `string | null` for the
+  // handlers below, which have to name a company for the invalidation to be
+  // tenant-correct.
+  if (activeCompanyId === null || isPending) return <TableSkeleton rows={6} />;
+  // This replaces an error card rendered *above* a table that kept its own
+  // skeleton, so a failed first load used to leave the failure and the loading
+  // state on screen together with nothing to say which one was live.
+  if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
+  if (!data) return <ErrorState error={new Error('This company has no metrics yet.')} />;
+
+  const snapshots = data.snapshots;
+
+  // The three handlers are arrows rather than declarations so they close over
+  // the narrowed company id; a hoisted declaration is analysed outside the
+  // guards above and would have to widen it back to `string | null`.
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    createSnapshot.mutate({ companyId: activeCompanyId, form });
+  };
+
+  const saveEdit = (s: Snapshot) => {
+    if (!editing) return;
+    // The editor closes on submit, not on success. Leaving the input mounted
+    // while the write is in flight means its own `onBlur` can fire and save the
+    // same value a second time.
+    const { field } = editing;
+    setEditing(null);
+    updateSnapshot.mutate({ companyId: activeCompanyId, snapshot: s, field, value: editValue });
+  };
+
+  const confirmDelete = () => {
     if (!deleting) return;
     const month = deleting.month.slice(0, 10);
     setDeleting(null);
-    try {
-      await api.del(`/metrics/snapshot/${month}`);
-      push('Snapshot deleted.', 'success');
-      await reload();
-    } catch (err) {
-      push((err as Error).message, 'error');
-    }
-  }
+    deleteSnapshot.mutate({ companyId: activeCompanyId, month });
+  };
 
   const inputClassNames = {
     inputWrapper:
@@ -243,8 +283,8 @@ export function Metrics() {
                 value={form.notes} onValueChange={(v) => setForm({ ...form, notes: v })} />
 
               <div className="col-span-2 md:col-span-4 flex items-center gap-3 mt-1">
-                <Button type="submit" color="primary" size="sm" isLoading={submitting} className="bg-accent-gradient font-medium">
-                  {submitting ? 'Saving…' : 'Add snapshot'}
+                <Button type="submit" color="primary" size="sm" isLoading={createSnapshot.isPending} className="bg-accent-gradient font-medium">
+                  {createSnapshot.isPending ? 'Saving…' : 'Add snapshot'}
                 </Button>
               </div>
             </form>
@@ -256,7 +296,7 @@ export function Metrics() {
         <div className="runway-sheen" />
         <div className="relative flex items-center justify-between px-5 pt-5 pb-2">
           <span className="text-sm font-semibold text-runway-text">History</span>
-          {snapshots && snapshots.length > 0 && (
+          {snapshots.length > 0 && (
             <Button
               size="sm"
               variant="flat"
@@ -269,9 +309,6 @@ export function Metrics() {
           )}
         </div>
         <div className="relative px-4 pb-4">
-          {error !== null && <ErrorState error={error} onRetry={() => void reload()} />}
-          {snapshots === null && !error && <TableSkeleton rows={6} />}
-          {snapshots !== null && (
           <Table
             aria-label="Metric snapshot history"
             removeWrapper
@@ -378,7 +415,6 @@ export function Metrics() {
               }}
             </TableBody>
           </Table>
-          )}
         </div>
       </div>
 

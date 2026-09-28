@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Bell } from 'lucide-react';
 import { api } from '../lib/api';
+import { companyKeys } from '../lib/queryKeys';
 import { useCompany } from '../lib/CompanyContext';
 import { ACTION_VERBS, ENTITY_ICONS, ENTITY_LABELS, type ActivityItem } from '../lib/audit';
 
@@ -13,15 +15,30 @@ function timeAgo(iso: string) {
   return `${Math.round(hrs / 24)}d ago`;
 }
 
+/**
+ * The activity feed, as an ambient widget rather than a page.
+ *
+ * It fetches on mount and then never again: the dropdown is opened by a click, and
+ * the newest events should be present by then. `refetchOnWindowFocus` (a default,
+ * not set here) is what brings it back up to date when the user returns to the tab,
+ * which is also the recovery path if the request failed — the badge is not
+ * retryable on purpose. A bell that re-fires a request every time it is clicked
+ * would hammer the audit table for something the user is only glancing at.
+ */
 export function NotificationsBell() {
-  const { activeCompanyId, role } = useCompany();
-  const [items, setItems] = useState<ActivityItem[]>([]);
+  const { activeCompanyId } = useCompany();
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    api.get<ActivityItem[]>('/audit/recent').then(setItems).catch(() => setItems([]));
-  }, [activeCompanyId, role]);
+  const { data, isError } = useQuery({
+    queryKey: companyKeys.activity(activeCompanyId),
+    queryFn: ({ signal }) => api.get<ActivityItem[]>('/audit/recent', signal),
+    enabled: activeCompanyId !== null,
+  });
+
+  // `?? []` rather than a `useState([])` initialiser, so an empty response and a
+  // not-yet-arrived one are the same value and the badge cannot read "0 events"
+  // before the fetch has been made.
+  const items = data ?? [];
 
   return (
     <div className="relative">
@@ -54,7 +71,16 @@ export function NotificationsBell() {
                 <span className="text-[10px] font-medium uppercase tracking-wider text-runway-muted">{items.length} events</span>
               </div>
               <div className="max-h-72 overflow-y-auto">
-                {items.length === 0 && (
+                {/*
+                  Three states, not one. The previous version caught every failure
+                  and set the list to empty, so a server that was down rendered
+                  "Nothing yet." — indistinguishable from a company that genuinely
+                  has no events, and the more likely of the two to send someone
+                  looking for a setting that does not exist. A failed read says so;
+                  it does not masquerade as an empty one.
+                */}
+                {isError && <p className="text-xs text-runway-negative/90 text-center py-8">Could not load activity.</p>}
+                {!isError && items.length === 0 && (
                   <p className="text-xs text-runway-muted text-center py-8">Nothing yet.</p>
                 )}
                 {items.map((item) => {

@@ -30,7 +30,7 @@ Do not start a new phase without confirming phases before it are done.
 | 3b | CAS token claim, fixes the simultaneous-refresh race | **done** (`8adb097`) | [archive/phases-1-3b.md](archive/phases-1-3b.md) |
 | **3c** | **Regressions in shipped phases** | **done** (`2630072`) | [archive/phase-3c-regressions.md](archive/phase-3c-regressions.md) |
 | 4 | Credential encryption (AES-256-GCM) + real API keys | **done** (`4327a34`) | [archive/phase-4-credential-encryption.md](archive/phase-4-credential-encryption.md) |
-| 5 | Frontend data layer | **in progress** | [phase-5-frontend-data-layer.md](phase-5-frontend-data-layer.md) |
+| 5 | Frontend data layer | **done** | [archive/phase-5-frontend-data-layer.md](archive/phase-5-frontend-data-layer.md) |
 | 6 | CI, deploy, observability | not started | [phase-6-ci-deploy-observability.md](phase-6-ci-deploy-observability.md) |
 | 7 | Frontend accessibility, navigation, bundle | not started | [phase-7-accessibility-navigation-bundle.md](phase-7-accessibility-navigation-bundle.md) |
 
@@ -38,10 +38,15 @@ Phase 3c was a late insertion. Phases 1–3b shipped with defects that were only
 found by auditing them afterwards — one of them a privilege escalation. It ran
 before Phase 4, and moved to `archive/` once its checklist was ticked.
 
-**Next up is Phase 5** (frontend data layer), in progress. Its open decision —
-TanStack Query or a hand-rolled `useResource` — was resolved in the phase doc in
-favour of TanStack Query, and the data layer is wired. What remains is migrating
-the 18 pages.
+**Next up is Phase 6** (CI, deploy, observability), once Phase 5's commit lands.
+Phase 5 resolved its open decision in favour of TanStack Query v5, migrated every
+fetch in `src` onto it, and flipped `react-hooks/set-state-in-effect` back to
+`error` — the whole tree passes at that severity, so the rule is a gate again
+rather than a warning. The one thing worth knowing before starting Phase 6 is
+carried over from Phase 4: share-link tokens backfilled by the migration carry a
+`pending:` marker and stay unreadable until
+`pnpm --filter runway-backend exec tsx src/scripts/reencrypt-share-tokens.ts`
+runs, and nothing fails loudly if you skip it. That belongs in the deploy runbook.
 
 **Phase 7** was split out of Phase 5, whose doc originally carried a list headed
 "Also folded in, because they are the same class of work" — mobile navigation,

@@ -4,6 +4,9 @@ import {
   LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, GitCompare, Command, Rocket,
   SlidersHorizontal, UserCog, Activity, Plug, CreditCard, KeyRound, MonitorSmartphone,
 } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
+import { useCompany } from '../lib/CompanyContext';
+import { ROLE_LABELS } from '../lib/permissions';
 
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -28,6 +31,40 @@ const secondaryLinks = [
 
 export function Sidebar() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
+  const { companies, activeCompanyId, role } = useCompany();
+
+  /**
+   * Who is signed in, from the server.
+   *
+   * This block used to read `"DF"` and `"Demo Founder"` outright, which was not a
+   * placeholder waiting to be filled in — it meant the name the server returned
+   * in Phase 3c was fetched and then never displayed anywhere. A real user saw
+   * another person's name in the only identity the app has.
+   *
+   * The email is the fallback rather than a second lookup because a user record
+   * without a name is a real case, not a broken one, and an empty avatar next to
+   * a blank line reads as a failed load.
+   */
+  const displayName = user?.name?.trim() || user?.email || 'Signed out';
+
+  /**
+   * Two letters from whatever is on screen above.
+   *
+   * Falls back to `?` rather than a guessed name, because the alternative is a
+   * plausible-looking pair of initials for someone who never gave a name — the
+   * same invented-identity failure in miniature.
+   */
+  const initials =
+    displayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('') || '?';
+
+  const companyName = companies.find((c) => c.id === activeCompanyId)?.name;
+  const byline = [ROLE_LABELS[role], companyName].filter(Boolean).join(' · ');
 
   return (
     <aside className="hidden md:flex md:w-64 flex-col shrink-0 min-h-screen bg-runway-charcoal/70 backdrop-blur-xl border-r border-runway-border/60 relative overflow-hidden">
@@ -78,12 +115,15 @@ export function Sidebar() {
         </button>
 
         <div className="flex items-center gap-2.5 rounded-xl border border-runway-border/70 bg-runway-surface/60 px-3 py-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-runway-accent/80 to-runway-accent2/60 flex items-center justify-center text-white text-xs font-semibold shrink-0">
-            DF
+          <div
+            aria-hidden
+            className="w-8 h-8 rounded-lg bg-gradient-to-br from-runway-accent/80 to-runway-accent2/60 flex items-center justify-center text-white text-xs font-semibold shrink-0"
+          >
+            {initials}
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-runway-text truncate">Demo Founder</p>
-            <p className="text-[10px] text-runway-muted">Owner · Runway</p>
+            <p className="text-xs font-medium text-runway-text truncate">{displayName}</p>
+            <p className="text-[10px] text-runway-muted">{byline}</p>
           </div>
         </div>
       </div>

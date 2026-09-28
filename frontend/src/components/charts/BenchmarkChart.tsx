@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
 import { Chip } from '@heroui/react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { useCompany } from '../../lib/CompanyContext';
+import { companyKeys } from '../../lib/queryKeys';
 import { chartColors } from './chartTheme';
 
 interface BenchmarkMetric {
@@ -57,15 +58,34 @@ function BandRow({ m }: { m: BenchmarkMetric }) {
  * percentiles — the disclosure caption must stay visible per the v3 plan.
  */
 export function BenchmarkChart() {
-  const { activeCompanyId, role } = useCompany();
-  const [data, setData] = useState<BenchmarkResponse | null>(null);
+  const { activeCompanyId } = useCompany();
 
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    api.get<BenchmarkResponse>('/metrics/benchmarks').then(setData).catch(() => setData(null));
-  }, [activeCompanyId, role]);
+  const { data, isPending, isError, error } = useQuery({
+    queryKey: companyKeys.benchmarks(activeCompanyId),
+    queryFn: ({ signal }) => api.get<BenchmarkResponse>('/metrics/benchmarks', signal),
+    enabled: activeCompanyId !== null,
+  });
 
-  if (!data) return <p className="px-5 pb-5 text-sm text-runway-muted">Loading benchmarks…</p>;
+  if (activeCompanyId === null || isPending) return <p className="px-5 pb-5 text-sm text-runway-muted">Loading benchmarks…</p>;
+
+  /**
+   * A failure is not a loading state.
+   *
+   * This read used to `.catch(() => setData(null))`, which made a dead server
+   * indistinguishable from a slow one — the `!data` guard above then showed
+   * "Loading benchmarks…" indefinitely, so a reader whose API was down was told
+   * the app was still working. `ErrorState` is the app-shell component, so the
+   * message is inlined here to match the card it sits in.
+   */
+  if (isError) {
+    return (
+      <p className="px-5 pb-5 text-sm text-danger">
+        Could not load benchmarks. {error instanceof Error ? error.message : 'Please try again.'}
+      </p>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <div className="flex flex-col gap-3 px-4 pb-4">

@@ -51,7 +51,7 @@ function dashboardFor(companyId: string, mrr: number): DashboardResponse {
  */
 function DashboardFor({ companyId }: { companyId: string | null }) {
   const { data, isPending, isError } = useQuery({
-    queryKey: companyKeys.dashboard(companyId ?? 'unset'),
+    queryKey: companyKeys.dashboard(companyId),
     queryFn: ({ signal }) => api.get<DashboardResponse>('/metrics/dashboard', signal),
     // The rule from the phase doc: no company means no request. Not a shared
     // key, and not a request fired and cancelled.
@@ -131,6 +131,18 @@ describe('tenant isolation', () => {
     // a mysterious leak in whichever page test runs first.
     expect(companyKeys.dashboard(COMPANY_A)).toEqual(['company', COMPANY_A, 'dashboard']);
     expect(companyKeys.dashboard(COMPANY_A)).not.toEqual(companyKeys.dashboard(COMPANY_B));
+  });
+
+  it('cannot mistake "no company yet" for a company', () => {
+    // The reason the factories take `string | null` rather than a `string` with a
+    // placeholder substituted at each call site. A sentinel like 'unset' is a
+    // string that could collide with a real id; `null` is a value no id can be.
+    // So the bootstrap key is not merely different from every tenant's key, it is
+    // a different type of thing.
+    expect(companyKeys.dashboard(null)).toEqual(['company', null, 'dashboard']);
+    for (const id of [COMPANY_A, COMPANY_B]) {
+      expect(companyKeys.dashboard(null)).not.toEqual(companyKeys.dashboard(id));
+    }
   });
 
   it('issues no request at all when there is no company', async () => {

@@ -43,12 +43,12 @@ motion turned off, or using a screen reader.
 
 ### Navigation
 
-- **Mobile navigation exists below 768px.** `Sidebar.tsx:33` is `hidden md:flex`.
+- **Mobile navigation exists below 768px.** `Sidebar.tsx:70` is `hidden md:flex`.
   Below 768px there is no sidebar, no hamburger, no drawer and no bottom nav —
   the only navigation is the ⌘K palette, which is keyboard-only. The app is
   effectively desktop-only despite being responsive everywhere else.
 - **`aria-current="page"`** on the active nav item. Today it is conveyed by a CSS
-  class and a `layoutId` (`Sidebar.tsx:98-124`) — both visual, both invisible to
+  class and a `layoutId` (`Sidebar.tsx:138-166`) — both visual, both invisible to
   a screen reader.
 - **A skip link.** `AppShell.tsx:27` goes straight to `<main>` with no `id`, so
   there is nothing to skip to and no way to offer it.
@@ -101,9 +101,12 @@ motion turned off, or using a screen reader.
   Twitter card, no favicon, no `theme-color` and no manifest. A static
   `<title>` means all 18 routes share one title, and `document.title` is never
   managed.
-- **Real identity in the chrome.** `Sidebar.tsx:82-87` and `TopBar.tsx:113`
-  hardcode `"DF"` / `"Demo Founder"` while `SessionUser` sits unread. This is a
-  Phase 3c leftover: the session's name has been available since the token landed.
+- ~~**Real identity in the chrome.** `Sidebar.tsx` hardcoded `"DF"` / `"Demo
+  Founder"` while `SessionUser` sat unread.~~ **Done in Phase 5** — the sidebar
+  reads the session's name, falling back to the email, and the byline is the real
+  role and company. It was a Phase 3c leftover: the session's name has been
+  available since the token landed. It stayed in Phase 5 rather than here because
+  it is a data-state omission, not an accessibility judgement.
 
 ### Bundle
 

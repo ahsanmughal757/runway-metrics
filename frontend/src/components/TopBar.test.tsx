@@ -17,13 +17,12 @@
  * tests hold both that report and the gating to it. Removing either condition
  * from TopBar makes one of them fail.
  */
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api } from '../lib/api';
-import { AuthProvider } from '../lib/AuthContext';
-import { CompanyProvider, useCompany } from '../lib/CompanyContext';
+import { useCompany } from '../lib/CompanyContext';
+import { renderWithProviders } from '../test/render';
 import { TopBar } from './TopBar';
 
 const COMPANY = { id: 'co_1', name: 'Acme', persona: null };
@@ -38,16 +37,16 @@ function ModeProbe() {
   return <span data-testid="mode">{demo ? 'demo' : 'real'}</span>;
 }
 
+// The chain comes from `test/render` so it matches `main.tsx`. The top bar
+// renders `NotificationsBell`, which now reads the activity feed through the
+// data layer, so a harness without a `QueryProvider` throws before any of the
+// mode gating under test is reached.
 function renderTopBar() {
-  return render(
-    <MemoryRouter>
-      <AuthProvider>
-        <CompanyProvider>
-          <ModeProbe />
-          <TopBar />
-        </CompanyProvider>
-      </AuthProvider>
-    </MemoryRouter>,
+  return renderWithProviders(
+    <>
+      <ModeProbe />
+      <TopBar />
+    </>,
   );
 }
 

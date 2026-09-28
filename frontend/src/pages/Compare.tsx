@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Select, SelectItem } from '@heroui/react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { GitCompare } from 'lucide-react';
 import { api } from '../lib/api';
+import { companyKeys } from '../lib/queryKeys';
 import { useCompany } from '../lib/CompanyContext';
 import type { DashboardResponse } from '../lib/types';
 import { axisTickStyle, ChartTooltip, chartColors, gridStyle, monthLabel } from '../components/charts/chartTheme';
@@ -27,71 +29,81 @@ const OTHER_PERSONAS: Record<string, { key: string; label: string }[]> = {
 
 interface ComparePoint { month: string; ownMrr: number; compareMrr?: number }
 
+interface CompareResponse {
+  available: boolean;
+  companyName?: string;
+  snapshots?: { month: string; mrr: number }[];
+  reason?: string;
+}
+
 export function Compare() {
-  const { activeCompanyId, role } = useCompany();
-  const [own, setOwn] = useState<DashboardResponse | null>(null);
-  const [comparePersona, setComparePersona] = useState<string | null>(null);
-  const [compareLabel, setCompareLabel] = useState('');
-  const [compareData, setCompareData] = useState<{ month: string; mrr: number }[] | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const [compareError, setCompareError] = useState<unknown>(null);
-  const [attempt, setAttempt] = useState(0);
+  const { activeCompanyId } = useCompany();
+  const [chosen, setChosen] = useState<string | null>(null);
 
   const options = activeCompanyId ? OTHER_PERSONAS[activeCompanyId] ?? [] : [];
 
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    let cancelled = false;
-    setOwn(null);
-    setError(null);
-    api
-      .get<DashboardResponse>('/metrics/dashboard')
-      .then((d) => {
-        if (!cancelled) setOwn(d);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e);
-      });
-    if (options.length > 0 && !comparePersona) setComparePersona(options[0].key);
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCompanyId, role]); // eslint-disable-line react-hooks/exhaustive-deps
+  /**
+   * The selected peer, resolved from `options` on every render rather than
+   * stored.
+   *
+   * The stored version was the page's worst bug. It was seeded inside an effect
+   * (`if (options.length > 0 && !comparePersona) setComparePersona(...)`) that
+   * deliberately omitted `comparePersona` from its dependency list, so the
+   * default was chosen once and never again: switch to a company whose peer list
+   * does not contain the remembered persona and the chart kept comparing against
+   * a company the reader is no longer looking at, with the dropdown naming
+   * nothing they had chosen.
+   *
+   * Deriving it means a selection that is not on offer simply is not the
+   * selection. The state is kept — a user's explicit choice should survive a
+   * re-render — but it cannot outlive the list it was drawn from.
+   */
+  const comparePersona = chosen && options.some((o) => o.key === chosen) ? chosen : (options[0]?.key ?? null);
 
-  useEffect(() => {
-    if (!comparePersona) return;
-    let cancelled = false;
-    setUnavailable(false);
-    setCompareError(null);
-    // Cleared on every switch, not just on success. Without this a failed fetch
-    // left the *previous* persona's series in state while the selector showed
-    // the *new* persona, so the chart confidently attributed another company's
-    // MRR to the company the reader had just selected.
-    setCompareData(null);
-    api
-      .get<{ available: boolean; companyName?: string; snapshots?: { month: string; mrr: number }[]; reason?: string }>(
-        `/metrics/compare/${comparePersona}`,
-      )
-      .then((res) => {
-        if (cancelled) return;
-        if (!res.available) {
-          setUnavailable(true);
-          return;
-        }
-        setCompareLabel(res.companyName ?? comparePersona);
-        setCompareData(res.snapshots ?? []);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setCompareError(e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [comparePersona, attempt]);
+  const { data: own, isPending: ownPending, isError: ownFailed, error: ownError, refetch: refetchOwn } = useQuery({
+    queryKey: companyKeys.dashboard(activeCompanyId),
+    queryFn: ({ signal }) => api.get<DashboardResponse>('/metrics/dashboard', signal),
+    enabled: activeCompanyId !== null,
+  });
 
-  if (error) return <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />;
-  if (!own) return <ChartCardSkeleton height={360} />;
+  // Persona in the key as well as the tenant: switching the dropdown is a
+  // different question, and a shared key would show the old peer's line while
+  // the selector reads the new one.
+  const {
+    data: comparison,
+    isPending: comparePending,
+    isError: compareFailed,
+    error: compareError,
+    refetch: refetchCompare,
+  } = useQuery({
+    queryKey: companyKeys.compare(activeCompanyId, comparePersona ?? ''),
+    queryFn: ({ signal }) => api.get<CompareResponse>(`/metrics/compare/${comparePersona ?? ''}`, signal),
+    // No peer to ask about means no request, rather than a request for the empty
+    // string. The `options.length === 0` branch below renders the explanation.
+    enabled: comparePersona !== null,
+  });
+
+  /**
+   * The peer's display name, straight off the response.
+   *
+   * It used to be a second `useState` set in a `.then`, which is the same value
+   * the response already carried and therefore a second thing that could
+   * disagree with it — a stale name from a previous persona painted onto the
+   * current persona's line.
+   */
+  const compareLabel = comparison?.available === true ? (comparison.companyName ?? comparePersona ?? '') : '';
+  const unavailable = comparison?.available === false;
+
+  // The company check comes before `isPending`: a query disabled by `enabled` is
+  // permanently pending, so testing `isPending` alone would leave the skeleton up
+  // until bootstrap finished rather than only until this request did.
+  if (activeCompanyId === null || ownPending) return <ChartCardSkeleton height={360} />;
+  if (ownFailed) return <ErrorState error={ownError} onRetry={() => void refetchOwn()} />;
+  // An empty `own` is not a reason to keep showing a skeleton. The skeleton is
+  // the claim "we have asked and are waiting"; rendering it for a failed or
+  // absent response is the lie the shared `!own` branch used to tell, and it is
+  // why a dead API looked identical to a slow one here.
+  if (!own) return <ErrorState error={ownError ?? new Error('No comparison data for this company.')} />;
 
   if (options.length === 0) {
     return (
@@ -106,7 +118,10 @@ export function Compare() {
   const merged: ComparePoint[] = own.snapshots.map((s, i) => ({
     month: s.month,
     ownMrr: s.mrr,
-    compareMrr: compareData?.[i]?.mrr,
+    // `undefined` while the peer is loading or after it failed, which is what
+    // makes the chart draw only this company's line rather than a gap that
+    // reads as zero revenue for the peer.
+    compareMrr: comparison?.available ? comparison.snapshots?.[i]?.mrr : undefined,
   }));
 
   return (
@@ -122,7 +137,7 @@ export function Compare() {
           variant="bordered"
           className="w-64"
           selectedKeys={comparePersona ? [comparePersona] : []}
-          onSelectionChange={(keys) => setComparePersona(Array.from(keys)[0] as string)}
+          onSelectionChange={(keys) => setChosen(Array.from(keys)[0] as string)}
           classNames={{
             trigger: 'bg-white/[0.02] border-runway-border/70 rounded-xl shadow-soft',
             popoverContent: 'bg-runway-raised border border-runway-borderStrong rounded-xl shadow-raised',
@@ -135,7 +150,7 @@ export function Compare() {
         </Select>
       </div>
 
-      {compareError !== null && <ErrorState error={compareError} onRetry={() => setAttempt((n) => n + 1)} />}
+      {compareFailed && <ErrorState error={compareError} onRetry={() => void refetchCompare()} />}
 
       {unavailable && (
         <EmptyState
@@ -145,7 +160,7 @@ export function Compare() {
         />
       )}
 
-      {!unavailable && !compareError && (
+      {!unavailable && !compareFailed && (
         <div className="runway-card overflow-hidden">
           <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-3">
             <h3 className="text-sm font-semibold text-runway-text">MRR — this company vs. {compareLabel || '…'}</h3>
@@ -159,7 +174,14 @@ export function Compare() {
             </div>
           </div>
           <div className="relative px-2 pb-3">
-            <ResponsiveContainer width="100%" height={340}>
+            {/* The card's frame and the peer's name come from the previous
+                response, so the chart area alone is replaced while this persona's
+                line is in flight. Replacing the whole card instead would hide
+                the very control that changes the persona. */}
+            {comparePending ? (
+              <ChartCardSkeleton height={340} />
+            ) : (
+              <ResponsiveContainer width="100%" height={340}>
               <LineChart data={merged} margin={{ top: 10, right: 14, left: 0, bottom: 0 }}>
                 <CartesianGrid {...gridStyle} />
                 <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
@@ -185,7 +207,8 @@ export function Compare() {
                   activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.amber, strokeWidth: 2.5 }}
                 />
               </LineChart>
-            </ResponsiveContainer>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       )}

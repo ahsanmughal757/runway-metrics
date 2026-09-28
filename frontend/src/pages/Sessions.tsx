@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Chip, Table, TableHeader, TableColumn, TableBody, TableRow, TableCell } from '@heroui/react';
 import { MonitorSmartphone } from 'lucide-react';
 import { ApiError, api } from '../lib/api';
 import { useToast } from '../lib/ToastContext';
 import { TableSkeleton } from '../components/Skeleton';
 import { ErrorState } from '../components/ErrorState';
+import { authKeys } from '../lib/queryKeys';
 
 interface SessionRow {
   id: string;
@@ -74,60 +75,69 @@ function describeAgent(userAgent: string | null): string {
 
 export function Sessions() {
   const { push } = useToast();
-  const [sessions, setSessions] = useState<SessionRow[] | null>(null);
-  const [unavailable, setUnavailable] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const [attempt, setAttempt] = useState(0);
-  const [revoking, setRevoking] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let cancelled = false;
-    setSessions(null);
-    setUnavailable(false);
-    setError(null);
-    api
-      .get<SessionRow[]>('/auth/sessions')
-      .then((rows) => {
-        if (!cancelled) setSessions(rows);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        // In demo mode the API has no session table and refuses the route. Saying
-        // "no devices are signed in" there would be a lie: the user would conclude
-        // they are safe when the list was never consulted.
-        //
-        // Only a refusal earns that explanation. An unreachable API or a 500 is a
-        // different failure, and it used to land here too - which meant a backend
-        // that was merely down told the reader to go and enable the database.
-        const status = e instanceof ApiError ? e.status : undefined;
-        if (status === 403 || status === 404) {
-          setUnavailable(true);
-          return;
-        }
-        setError(e);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt]);
+  const { data: sessions, isPending, isError, error, refetch } = useQuery({
+    // `authKeys`, not `companyKeys`: `/auth/sessions` carries `AuthGuard` and no
+    // `CompanyScopeGuard`, and answers from the caller's own sessions, so the
+    // company is not part of what this request depends on. A company-scoped key
+    // would refetch an identical list every time the user switched company.
+    //
+    // There is consequently no `enabled` guard here, and that is the point rather
+    // than an omission: the rule it enforces is "a query that needs a company must
+    // not run without one", and this query does not need one. Gating it on the
+    // bootstrap would delay the page for a dependency it never had.
+    queryKey: authKeys.sessions(),
+    queryFn: ({ signal }) => api.get<SessionRow[]>('/auth/sessions', signal),
+  });
 
-  async function revoke(row: SessionRow) {
-    setRevoking(row.id);
-    try {
-      await api.del(`/auth/sessions/${row.id}`);
-      setSessions((prev) => (prev ?? []).filter((s) => s.id !== row.id));
+  // In demo mode the API has no session table and refuses the route. Saying
+  // "no devices are signed in" there would be a lie: the user would conclude
+  // they are safe when the list was never consulted.
+  //
+  // Only a refusal earns that explanation. An unreachable API or a 500 is a
+  // different failure, and it used to land here too - which meant a backend that
+  // was merely down told the reader to go and enable the database. Derived from
+  // the query's error rather than stored in a flag, so it cannot survive the
+  // error it was describing: a successful retry that lands on a 403 resets
+  // nothing, because there is nothing to reset.
+  const unavailable = error instanceof ApiError && (error.status === 403 || error.status === 404);
+
+  const revoke = useMutation({
+    mutationFn: (row: SessionRow) => api.del<void>(`/auth/sessions/${row.id}`),
+    onSuccess: (_result, row) => {
+      // 204, so the cache is edited in place rather than refetched: the row is
+      // gone, or the request would have thrown. The key names the account rather
+      // than a tenant, so there is no company to capture in the variables here —
+      // which is what makes this safe to fire without threading one through.
+      queryClient.setQueryData<SessionRow[]>(authKeys.sessions(), (prev) => prev?.filter((s) => s.id !== row.id));
       push(
-        row.isCurrent
-          ? 'This device was signed out. You will be asked to sign in again.'
-          : 'That device was signed out.',
+        row.isCurrent ? 'This device was signed out. You will be asked to sign in again.' : 'That device was signed out.',
         'success',
       );
-    } catch (err) {
-      push((err as Error).message, 'error');
-    } finally {
-      setRevoking(null);
-    }
+    },
+    onError: (e: unknown) => {
+      push((e as Error).message, 'error');
+    },
+  });
+
+  if (isPending) return <TableSkeleton rows={3} />;
+  // The database message is a different claim from "this failed", and it is only
+  // true for a refusal - so it is chosen by the status, never by the fact of
+  // having an error at all.
+  if (unavailable) {
+    return (
+      <p className="text-sm text-runway-muted px-1 py-6 text-center">
+        Sessions are only tracked when the API runs against a database. Start it with{' '}
+        <code className="text-xs bg-white/[0.03] border border-runway-border/60 rounded-md px-1.5 py-0.5">ENABLE_DATABASE=true</code>{' '}
+        to see this list.
+      </p>
+    );
   }
+  if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
+  // An empty table is a claim about the account, and this account is signed in -
+  // so "none" and "not loaded" cannot be rendered as the same thing.
+  if (!sessions) return <ErrorState error={new Error('The device list did not load.')} />;
 
   return (
     <motion.div
@@ -152,73 +162,60 @@ export function Sessions() {
             <span className="text-sm font-semibold text-runway-text">Devices</span>
           </div>
           <div className="relative px-4 pb-4">
-            {sessions === null && !unavailable && !error && <TableSkeleton rows={3} />}
-            {error !== null && (
-              <div className="px-1 py-2">
-                <ErrorState error={error} onRetry={() => setAttempt((n) => n + 1)} />
-              </div>
-            )}
-            {unavailable && (
-              <p className="text-sm text-runway-muted px-1 py-6 text-center">
-                Sessions are only tracked when the API runs against a database. Start it with{' '}
-                <code className="text-xs bg-white/[0.03] border border-runway-border/60 rounded-md px-1.5 py-0.5">
-                  ENABLE_DATABASE=true
-                </code>{' '}
-                to see this list.
-              </p>
-            )}
-            {sessions !== null && (
-              <Table
-                aria-label="Signed-in devices"
-                removeWrapper
-                classNames={{
-                  th: 'bg-transparent text-runway-muted text-[11px] uppercase tracking-wider',
-                  td: 'text-runway-text py-3',
-                  tr: 'border-b border-runway-border/50 last:border-0',
-                }}
-              >
-                <TableHeader>
-                  {COLUMNS.map((c) => (
-                    <TableColumn key={c}>{c}</TableColumn>
-                  ))}
-                </TableHeader>
-                <TableBody emptyContent="No other devices are signed in." items={sessions}>
-                  {(s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <span>{describeAgent(s.userAgent)}</span>
-                          {s.isCurrent && (
-                            <Chip size="sm" variant="flat" color="primary">
-                              This device
-                            </Chip>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-runway-muted font-normal mt-0.5">
-                          Signed in {new Date(s.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-runway-muted text-xs font-mono">
-                        {s.ip ?? <span className="font-sans">Unknown</span>}
-                      </TableCell>
-                      <TableCell className="text-runway-muted text-xs">{activeLabel(s)}</TableCell>
-                      <TableCell className="text-runway-muted text-xs">{formatWhen(s.expiresAt)}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="light"
-                          color="danger"
-                          isLoading={revoking === s.id}
-                          onPress={() => revoke(s)}
-                        >
-                          {s.isCurrent ? 'Sign out' : 'Revoke'}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            )}
+            <Table
+              aria-label="Signed-in devices"
+              removeWrapper
+              classNames={{
+                th: 'bg-transparent text-runway-muted text-[11px] uppercase tracking-wider',
+                td: 'text-runway-text py-3',
+                tr: 'border-b border-runway-border/50 last:border-0',
+              }}
+            >
+              <TableHeader>
+                {COLUMNS.map((c) => (
+                  <TableColumn key={c}>{c}</TableColumn>
+                ))}
+              </TableHeader>
+              <TableBody emptyContent="No other devices are signed in." items={sessions}>
+                {(s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{describeAgent(s.userAgent)}</span>
+                        {s.isCurrent && (
+                          <Chip size="sm" variant="flat" color="primary">
+                            This device
+                          </Chip>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-runway-muted font-normal mt-0.5">
+                        Signed in {new Date(s.createdAt).toLocaleDateString('en-US', { dateStyle: 'medium' })}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-runway-muted text-xs font-mono">
+                      {s.ip ?? <span className="font-sans">Unknown</span>}
+                    </TableCell>
+                    <TableCell className="text-runway-muted text-xs">{activeLabel(s)}</TableCell>
+                    <TableCell className="text-runway-muted text-xs">{formatWhen(s.expiresAt)}</TableCell>
+                    <TableCell>
+                      {/* The row being revoked is read off the mutation rather
+                          than from a `revoking` state variable: the id has to
+                          travel with the request, and a second flag tracking it
+                          separately is a second thing that can disagree. */}
+                      <Button
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        isLoading={revoke.isPending && revoke.variables?.id === s.id}
+                        onPress={() => revoke.mutate(s)}
+                      >
+                        {s.isCurrent ? 'Sign out' : 'Revoke'}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </motion.div>

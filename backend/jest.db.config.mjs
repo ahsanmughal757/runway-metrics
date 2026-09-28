@@ -26,5 +26,17 @@ export default {
   // Each file boots an app and opens a pool; running them serially keeps the
   // connection count predictable and makes a failure's output unambiguous.
   maxWorkers: 1,
+  // Jest's 5s default is too tight for what these tests do, and it was not a
+  // theoretical margin. Each request here does real password hashing and real
+  // SQL, so a typical test costs ~1.1s and the heaviest cost ~1.8s. Under CPU
+  // contention that 5s budget was exceeded and `test:db` failed on a test that
+  // passes in every other run.
+  //
+  // That is worth more than a number, because Phase 6 puts this suite in CI: a
+  // gate that fails once every few runs gets re-run until green, and the one
+  // time it matters is the run nobody re-runs. 15s is ~10x the slowest real
+  // test here and still fails fast on a genuine hang, which 5x margin would not
+  // have told apart from contention.
+  testTimeout: 15_000,
   clearMocks: true,
 };

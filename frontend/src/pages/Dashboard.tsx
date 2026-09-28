@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button, Select, SelectItem } from '@heroui/react';
 import { DollarSign, TrendingDown, Flame, Gauge, Upload, PlusCircle } from 'lucide-react';
 import { api } from '../lib/api';
+import { companyKeys } from '../lib/queryKeys';
 import { useCompany } from '../lib/CompanyContext';
 import type { DashboardResponse } from '../lib/types';
 import { KpiCard } from '../components/KpiCard';
 import { CountUp } from '../components/CountUp';
 import { KpiCardSkeleton, ChartCardSkeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
+import { ErrorState } from '../components/ErrorState';
 import { MrrTrendChart } from '../components/charts/MrrTrendChart';
 import { MrrWaterfallChart } from '../components/charts/MrrWaterfallChart';
 import { ChurnTrendChart } from '../components/charts/ChurnTrendChart';
@@ -29,10 +32,7 @@ function fmtCurrency(n: number) {
 const sectionIds = { mrr: 'chart-mrr', churn: 'chart-churn', burn: 'chart-burn', nrr: 'chart-nrr', mom: 'chart-mom' };
 
 export function Dashboard() {
-  const { activeCompanyId, role } = useCompany();
-  const [data, setData] = useState<DashboardResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { activeCompanyId } = useCompany();
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const [range, setRange] = useState<'6' | '12' | '24' | 'all'>('12');
   const refs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -44,16 +44,15 @@ export function Dashboard() {
     refs.current[id] = el;
   }, []);
 
-  useEffect(() => {
-    if (!activeCompanyId) return;
-    setLoading(true);
-    setError(null);
-    api
-      .get<DashboardResponse>('/metrics/dashboard')
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [activeCompanyId, role]);
+  // Shared with `Metrics.tsx` and `Scenarios.tsx`, which read the same endpoint,
+  // so a snapshot imported on one of them updates all three without a second
+  // request. The company is the first element of the key, so switching company
+  // cannot serve the previous tenant's numbers under the new name.
+  const { data, isPending, isError, error, refetch } = useQuery({
+    queryKey: companyKeys.dashboard(activeCompanyId),
+    queryFn: ({ signal }) => api.get<DashboardResponse>('/metrics/dashboard', signal),
+    enabled: activeCompanyId !== null,
+  });
 
   function jumpTo(id: string) {
     refs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -61,15 +60,18 @@ export function Dashboard() {
     setTimeout(() => setHighlighted(null), 1400);
   }
 
-  if (loading) return <DashboardSkeleton />;
-  if (error)
-    return (
-      <div className="runway-card p-5 text-sm text-runway-negative border-runway-negative/30">{error}</div>
-    );
-  if (!data || data.snapshots.length === 0) return <EmptyDashboard />;
+  // The company is checked before `isPending` because a query disabled by
+  // `enabled` is permanently pending: testing `isPending` alone would show a
+  // skeleton that never resolves once the bootstrap had not yet produced a
+  // company. Checking first also narrows the id for the chart's own reads.
+  if (activeCompanyId === null || isPending) return <DashboardSkeleton />;
+  // The previous error branch was a red border around the message and nothing
+  // else, which left no way to try again short of reloading the page. It also
+  // could not tell a server that was down from one that refused.
+  if (isError) return <ErrorState error={error} onRetry={() => void refetch()} />;
+  if (!data || data.snapshots.length === 0 || !data.latest) return <EmptyDashboard />;
 
   const { latest, snapshots } = data;
-  if (!latest) return <EmptyDashboard />;
 
   const chartSnapshots = range === 'all' ? snapshots : snapshots.slice(-Number(range));
 

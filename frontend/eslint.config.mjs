@@ -31,15 +31,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': 'off',
-      // Every page fetches in an effect and stores the result in state. That is
-      // the pattern the Phase 5 rewrite replaces with a data layer, so holding
-      // the gate red on it now would only block every other change behind a
-      // refactor that is already scheduled. Kept visible as a warning, and it
-      // goes to `error` when those pages are rewritten.
-      'react-hooks/set-state-in-effect': 'warn',
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // Phase 5. Every page fetched in an effect and stored the result in state;
+      // they now read a data layer, and this gate is what stops the pattern
+      // coming back one page at a time. It was held at `warn` for exactly as long
+      // as the rewrite took, and the whole `src` tree passes at `error` — so this
+      // is no longer a warning anyone reads past.
+      'react-hooks/set-state-in-effect': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      '@typescript-eslint/consistent-type-imports': 'warn',
+      '@typescript-eslint/consistent-type-imports': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },

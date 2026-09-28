@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button, Input, Textarea } from '@heroui/react';
 import { FileDown, Link2, Lock } from 'lucide-react';
 import { api } from '../lib/api';
 import { useCompany } from '../lib/CompanyContext';
+import { companyKeys } from '../lib/queryKeys';
 import { useToast } from '../lib/ToastContext';
 import { EmptyState } from '../components/EmptyState';
 
@@ -25,38 +27,58 @@ const inputClassNames = {
 };
 
 export function InvestorUpdate() {
-  const { can } = useCompany();
+  const { can, activeCompanyId } = useCompany();
   const { push } = useToast();
+  const queryClient = useQueryClient();
   const [sections, setSections] = useState(defaultSections);
   const [periodLabel, setPeriodLabel] = useState(
     new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
   );
-  const [generating, setGenerating] = useState(false);
+  /**
+   * A two-second acknowledgement of the copy, not server state. A mutation stays
+   * successful for as long as the page is open, so the label has to be timed by
+   * hand; deriving it from `createLink.isSuccess` would read "Link copied!" for
+   * the rest of the session.
+   */
   const [copied, setCopied] = useState(false);
 
-  async function copyInvestorLink() {
-    try {
-      const { token } = await api.post<{ token: string }>('/reports/share-link');
-      const url = `${window.location.origin}/share/${token}`;
-      await navigator.clipboard.writeText(url);
+  // No `signal` on either mutation: `useMutation` hands out no abort signal and
+  // does not cancel on unmount, and it does not need to. A mutation writes to the
+  // cache rather than to component state, so a response that lands after the page
+  // has gone updates an entry nobody is rendering yet rather than resurrecting a
+  // dead one.
+  const createLink = useMutation({
+    // The company rides in the variables although the URL does not name it: the
+    // header carries it, but the cache write after the response has to name the
+    // tenant, and reading the company off the render at that point would address
+    // whichever company is on screen when the response lands.
+    mutationFn: (_input: { companyId: string | null }) => api.post<{ token: string }>('/reports/share-link'),
+    onSuccess: async ({ token }, { companyId }) => {
+      // A token and nothing else, so there is no link row to write into the list
+      // the share-links page reads: it is re-read instead. A `setQueryData` would
+      // have to invent the row the endpoint declined to send.
+      void queryClient.invalidateQueries({ queryKey: companyKeys.shareLinks(companyId) });
+      await navigator.clipboard.writeText(`${window.location.origin}/share/${token}`);
       setCopied(true);
       push('Link copied.', 'success');
       setTimeout(() => setCopied(false), 2000);
-    } catch (e) {
+    },
+    onError: (e: unknown) => {
       push((e as Error).message, 'error');
-    }
-  }
+    },
+  });
 
-  async function exportPdf() {
-    setGenerating(true);
-    try {
+  const exportPdf = useMutation({
+    // No company in the variables because nothing here writes to the cache, so
+    // there is no tenant to name. The PDF is rendered from the metrics and
+    // changes none of them; the only trace is an audit row, which the activity
+    // feed picks up on its next refetch.
+    mutationFn: (input: { periodLabel: string; sections: NarrativeSection[] }) =>
       // Goes through the api client rather than a bare fetch so the PDF
       // request carries the same auth and company headers, and gets the same
       // refresh-on-401 behaviour as every other call.
-      const blob = await api.post<Blob>('/reports/investor-update', {
-        periodLabel,
-        narrativeSections: sections,
-      });
+      api.post<Blob>('/reports/investor-update', { periodLabel: input.periodLabel, narrativeSections: input.sections }),
+    onSuccess: (blob) => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -64,12 +86,11 @@ export function InvestorUpdate() {
       a.click();
       URL.revokeObjectURL(url);
       push('Investor update generated.', 'success');
-    } catch (e) {
+    },
+    onError: (e: unknown) => {
       push((e as Error).message, 'error');
-    } finally {
-      setGenerating(false);
-    }
-  }
+    },
+  });
 
   if (!can('reports:generate')) {
     return (
@@ -131,13 +152,13 @@ export function InvestorUpdate() {
       ))}
 
       <div>
-        <Button color="primary" size="sm" isLoading={generating} onPress={exportPdf} startContent={!generating && <FileDown size={14} />} className="bg-accent-gradient font-medium">
-          {generating ? 'Generating…' : 'Export PDF'}
+        <Button color="primary" size="sm" isLoading={exportPdf.isPending} onPress={() => exportPdf.mutate({ periodLabel, sections })} startContent={!exportPdf.isPending && <FileDown size={14} />} className="bg-accent-gradient font-medium">
+          {exportPdf.isPending ? 'Generating…' : 'Export PDF'}
         </Button>
         <Button
           size="sm"
           variant="bordered"
-          onPress={copyInvestorLink}
+          onPress={() => createLink.mutate({ companyId: activeCompanyId })}
           startContent={<Link2 size={14} />}
           className="ml-2 border-runway-border text-runway-text"
         >

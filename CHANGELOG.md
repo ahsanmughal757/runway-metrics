@@ -6,6 +6,143 @@ what the client *sees* belongs here, whether or not it is a bug fix.
 
 ## Unreleased
 
+### Fixed: switching company could show the previous company's numbers
+
+`was:` every page kept its own copy of what it had fetched, in `useState`, keyed
+by nothing. Six pages also carried a `useState(0)` whose only job was to be a
+retry key for an effect, and no fetch passed an `AbortSignal` - so a slow response
+for the company you just left would land on top of the company you are now
+looking at, last-write-wins rather than last-request-wins.
+
+`now:` reads go through TanStack Query, and **the company id is the first element
+of every tenant-scoped cache key**. That part is the fix rather than a tidy-up: a
+cache survives a company switch, so a key that does not name the tenant will
+happily serve the previous company's MRR under the new company's name.
+
+The leak was invisible from the server. Every request in it was correctly
+authorised, because the header did name the company the server then answered for
+- the wrong data was already in the browser. No backend test can see it, which is
+why `frontend/src/lib/queryKeys.test.tsx` exists: five cases, each verified to
+fail when the company is dropped from the key.
+
+### Fixed: a failed fetch was shown as a loading screen, or as no data at all
+
+`was:` `null` meant "loading" on most pages, and on several a failed fetch left
+that same screen up forever. `BenchmarkChart` caught its error and set `null`, so
+a dead API rendered "Loading benchmarks..." indefinitely - a reader whose backend
+was down was told the app was still working. `NotificationsBell` caught its error
+into `[]` and rendered "Nothing yet.", which is indistinguishable from a company
+with no activity and points people at a setting that does not exist. The share
+view had no empty state at all, so a company with no recorded metrics rendered
+nothing below the header. The benchmark percentile marker was also stamped from
+the browser clock, so `revokedAt` could be hours from when a credential actually
+died.
+
+`now:` loading, error and empty are three separate branches. The first load's
+failure is reported with a retry; a background refetch that fails leaves the
+last good data on screen, which is still correct as of when it was fetched.
+Network failures and server refusals are worded differently on purpose, because
+lumping them together is what once told anyone whose session had expired to go
+and enable the database. Revocation timestamps and percentile positions are
+re-read from the server rather than invented in the browser.
+
+### Fixed: signing out did not clear the previous tenant
+
+`was:` signing out cleared the token. It left the company id in React state, and
+left every fetched page in its own `useState`, so a signed-out shell kept
+rendering one tenant's numbers - and the next person to open the app on a shared
+machine saw them before their own bootstrap resolved.
+
+`now:` the tenant is **derived** from the bootstrap cache entry rather than
+stored, so "no session" and "no tenant" are the same state and cannot drift
+apart. There is no branch in which a remembered company outlives the response that
+established it. Signing out additionally clears the whole query cache. The
+memory of *which* company you preferred survives a sign-out, and is validated
+against the new session's company list before it is believed - that is a
+preference, not a credential.
+
+### Fixed: the app showed a hardcoded identity
+
+`was:` the sidebar read `"DF"` and `"Demo Founder"` - not as a placeholder waiting
+to be filled in, but as what was shipped. The user's name is returned by
+`/auth/me` and was displayed nowhere in the chrome, so every real user saw another
+person's name in the only identity the app has.
+
+`now:` the sidebar reads the session's name, falling back to the email, and the
+byline is the real role and company.
+
+### Changed: requests are cancelled, deduplicated, retried, and share one entry per company
+
+`was:` no request was ever cancelled. `/metrics/dashboard` was fetched separately
+by the dashboard, the metrics page, the scenarios page, and the top bar's
+"as of" byline - four requests, four copies, four chances to disagree.
+
+`now:` one cache entry per company per resource, so an imported snapshot updates
+all four with no further request. Cancelled requests abandon their work. A
+network error is retried twice with backoff, which is a visible change: a reader
+on a bad connection now waits out the retry budget instead of being told
+immediately that the server is down, and a genuinely unreachable server takes
+longer to report. 4xx is never retried. Mutations are never retried at all - a
+`POST /metrics/import/commit` that timed out may well have committed, and
+retrying it can double-import.
+
+`was:` (also) the persona comparison kept whichever peer was chosen first, for the
+life of the page, even after switching to a company whose peer list did not
+contain it - so the chart compared against a company the reader was no longer
+looking at, under a dropdown that named nothing they had picked.
+
+### Fixed: the app told you the wrong thing when a save half-worked
+
+`was:` `Metrics.tsx` used a single `error` slot for two different failures. A save
+that succeeded and whose follow-up reload then failed rendered "Could not load
+this" above a stale table, and its Retry button called the very function its own
+comment said was deliberately not the retry path for the initial load.
+
+`now:` a write that lands is separated from a write that fails, and a background
+refresh that fails is not reported as a failed load.
+
+### Fixed: a missing permission was drawn as an empty list
+
+`was:` a user without `apiKeys:manage` was served an empty array, and the page
+rendered **"No keys yet."** - a permission rendered as the truth about their
+account. `Cohorts` showed a bare red error card with no way to retry.
+
+`now:` both name the permission as such, and offer a retry.
+
+### Fixed: typing in Settings could be lost to a background refresh
+
+`was:` the settings form held an editable draft seeded from the fetched record.
+The data layer refetches on window focus, so a refetch returning different
+settings - another admin moved a threshold - would race the draft and a Save
+could silently overwrite that change.
+
+`now:` the draft re-seeds during render when the fetched record genuinely changes,
+which is React's own "adjust state when a prop changes" pattern. It is not
+cleared on every refetch, because that would destroy a half-typed form every time
+the reader alt-tabbed.
+
+### Internal: the data layer, and what it replaced
+
+`was:` 15 pages and 3 components each hand-rolled `useEffect` + `useState`
+fetching, with `cancelled` flags, retry counters, and a `null` sentinel doing
+double duty as "loading". `react-hooks/set-state-in-effect` was downgraded to a
+warning to unblock other work.
+
+`now:` TanStack Query, with every key built by a factory in `lib/queryKeys.ts` so
+"did you remember the company?" is a question with a compile error attached. The
+lint rule is back to `error`, along with `no-explicit-any` and
+`consistent-type-imports`, and the whole `src` tree passes at that severity - so
+none of them is a warning anyone reads past. `CompanyContext` is a deliberate
+exception to the "no state from a fetch" rule in exactly one place: it holds the
+*preferred* company, which is user intent rather than a fetch result.
+
+Accessibility, mobile navigation, meta tags and the bundle budget were removed
+from this phase's scope and moved to Phase 7. The reasoning is recorded in
+`plan/phase-5-frontend-data-layer.md`: this phase's done condition is mechanical,
+while Phase 7's are judgements a checklist can tick while the product is still
+bad, and coupling the two meant a data-layer regression could only be observed
+through an accessibility audit nobody has time to run.
+
 ### Fixed: share-link tokens were stored in plaintext, and there was no crypto in the codebase
 
 `was:` `CREDENTIALS_MASTER_KEY` was generated, documented, redacted, and

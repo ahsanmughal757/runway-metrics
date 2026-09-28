@@ -23,6 +23,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api } from './api';
 import { AuthProvider, useAuth } from './AuthContext';
 import { CompanyProvider, useCompany } from './CompanyContext';
+import { QueryProvider } from './QueryContext';
 import { ACTIVE_COMPANY_KEY, TOKEN_KEY, writeKey } from './storage';
 
 const COMPANY = { id: 'co_1', name: 'Acme', persona: null };
@@ -109,11 +110,22 @@ function renderApp() {
   );
 }
 
+/**
+ * The two providers, and the query client the bootstrap now lives in.
+ *
+ * `QueryProvider` is the whole difference from `main.tsx`: the router, toasts and
+ * HeroUI are not under test here and adding them would only make a failure harder
+ * to read. The client is not optional, because the bootstrap is a cache entry now
+ * — and it is the *test's own* client, since the provider creates one per mount,
+ * so no entry survives a test into the next.
+ */
 function Providers({ children }: { children: ReactNode }) {
   return (
-    <AuthProvider>
-      <CompanyProvider>{children}</CompanyProvider>
-    </AuthProvider>
+    <QueryProvider>
+      <AuthProvider>
+        <CompanyProvider>{children}</CompanyProvider>
+      </AuthProvider>
+    </QueryProvider>
   );
 }
 
@@ -178,7 +190,15 @@ describe('CompanyProvider bootstrap', () => {
 
     renderApp();
 
-    await waitFor(() => expect(company?.offline).toBe(true));
+    // The generous timeout is a behaviour change, not slowness in the test. The
+    // hand-rolled effect reported a failed fetch immediately; the data layer
+    // retries a network error twice with backoff, on the grounds that a tunnel or
+    // a sleeping laptop is worth waiting out. So the offline screen now takes the
+    // client's retry budget to appear. That is the right trade — a reader on a
+    // train who would have been shown a hard error is now usually spared it — but
+    // it is visible to anyone on a bad connection, so it is written down here
+    // rather than discovered as "the loading screen got slower".
+    await waitFor(() => expect(company?.offline).toBe(true), { timeout: 15_000 });
     expect(company?.unauthorized).toBe(false);
     expect(company?.activeCompanyId).toBeNull();
   });
