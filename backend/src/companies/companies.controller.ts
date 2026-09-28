@@ -54,11 +54,7 @@ export class CompaniesController {
   @Patch('members/:membershipId/role')
   @UseGuards(PermissionsGuard)
   @RequirePermission('members:updateRole')
-  async updateRole(
-    @CurrentUser() user: RequestUser,
-    @Param('membershipId') membershipId: string,
-    @Body() dto: UpdateRoleDto,
-  ) {
+  async updateRole(@CurrentUser() user: RequestUser, @Param('membershipId') membershipId: string, @Body() dto: UpdateRoleDto) {
     // An ADMIN can manage the team but must not outrank an OWNER. Enforced from
     // the caller's own role, so it holds even if the permission table is later
     // widened by mistake. The repository re-checks inside its transaction.

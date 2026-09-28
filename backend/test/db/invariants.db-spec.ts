@@ -60,16 +60,12 @@ describe('database invariants', () => {
 
       // The first of the month is accepted, so the check is not simply
       // rejecting everything.
-      await expect(
-        prisma.metricSnapshot.create({ data: snapshot(company.id, { month: JAN(1) }) }),
-      ).resolves.toBeTruthy();
+      await expect(prisma.metricSnapshot.create({ data: snapshot(company.id, { month: JAN(1) }) })).resolves.toBeTruthy();
     });
 
     it('rejects a customer signup month that is not the first of its month', async () => {
       const { company } = await seedCompany();
-      await expect(
-        prisma.customer.create({ data: { companyId: company.id, name: 'Late', signupMonth: JAN(9, 2) } }),
-      ).rejects.toThrow();
+      await expect(prisma.customer.create({ data: { companyId: company.id, name: 'Late', signupMonth: JAN(9, 2) } })).rejects.toThrow();
     });
 
     it('rejects a monthly value dated off the first of the month', async () => {
@@ -186,9 +182,9 @@ describe('database invariants', () => {
     });
 
     it('refuses a non-positive threshold', async () => {
-      await expect(
-        prisma.company.create({ data: { name: 'Zero', slug: 'zero-threshold', runwayGreenMonths: 0 } }),
-      ).rejects.toThrow(/runway/i);
+      await expect(prisma.company.create({ data: { name: 'Zero', slug: 'zero-threshold', runwayGreenMonths: 0 } })).rejects.toThrow(
+        /runway/i,
+      );
     });
 
     it('accepts the defaults and an explicit ordered pair', async () => {
@@ -230,9 +226,7 @@ describe('database invariants', () => {
 
   describe('email normalisation', () => {
     it('refuses a user email that is not lower-cased and trimmed', async () => {
-      await expect(
-        prisma.user.create({ data: { email: 'NotLower@Example.COM ', passwordHash: 'x' } }),
-      ).rejects.toThrow(/email/i);
+      await expect(prisma.user.create({ data: { email: 'NotLower@Example.COM ', passwordHash: 'x' } })).rejects.toThrow(/email/i);
     });
 
     it('refuses a non-normalised invite email', async () => {
@@ -284,7 +278,13 @@ describe('database invariants', () => {
 
     it('does not treat an accepted invite as pending', async () => {
       const { company, user } = await seedCompany();
-      const base = { companyId: company.id, email: uniqueEmail('invitee'), role: 'VIEWER' as const, invitedById: user.id, expiresAt: in14Days() };
+      const base = {
+        companyId: company.id,
+        email: uniqueEmail('invitee'),
+        role: 'VIEWER' as const,
+        invitedById: user.id,
+        expiresAt: in14Days(),
+      };
       await prisma.invite.create({ data: { ...base, token: uniqueEmail('t'), status: 'ACCEPTED', respondedAt: new Date() } });
       await expect(prisma.invite.create({ data: { ...base, token: uniqueEmail('t') } })).resolves.toBeTruthy();
     });

@@ -1,11 +1,24 @@
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Button, Input,
-  Dropdown, DropdownTrigger, DropdownMenu, DropdownItem,
-  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  Table, TableHeader, TableColumn, TableBody, TableRow, TableCell,
+  Button,
+  Input,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
 } from '@heroui/react';
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { Download, MoreVertical, Pencil, Trash2 } from 'lucide-react';
@@ -19,8 +32,17 @@ import { companyKeys } from '../lib/queryKeys';
 import { chartColors } from '../components/charts/chartTheme';
 
 const CSV_COLUMNS = [
-  'month', 'mrr', 'newMrr', 'expansionMrr', 'contractionMrr', 'churnedMrr',
-  'newCustomers', 'churnedCustomers', 'totalCustomers', 'burnRate', 'cash',
+  'month',
+  'mrr',
+  'newMrr',
+  'expansionMrr',
+  'contractionMrr',
+  'churnedMrr',
+  'newCustomers',
+  'churnedCustomers',
+  'totalCustomers',
+  'burnRate',
+  'cash',
 ] as const;
 
 function toCsv(snapshots: Snapshot[]): string {
@@ -55,8 +77,17 @@ function MrrSparkline({ series }: { series: Snapshot[] }) {
 
 const emptyForm = {
   month: new Date().toISOString().slice(0, 7),
-  mrr: '', newMrr: '', expansionMrr: '', contractionMrr: '', churnedMrr: '',
-  newCustomers: '', churnedCustomers: '', totalCustomers: '', burnRate: '', cash: '', notes: '',
+  mrr: '',
+  newMrr: '',
+  expansionMrr: '',
+  contractionMrr: '',
+  churnedMrr: '',
+  newCustomers: '',
+  churnedCustomers: '',
+  totalCustomers: '',
+  burnRate: '',
+  cash: '',
+  notes: '',
 };
 
 type EditableField = 'mrr' | 'burnRate' | 'cash' | 'totalCustomers' | 'notes';
@@ -118,10 +149,15 @@ export function Metrics() {
     mutationFn: (input: { companyId: string; form: typeof emptyForm }) =>
       api.post('/metrics/snapshot', {
         month: `${input.form.month}-01`,
-        mrr: Number(input.form.mrr), newMrr: Number(input.form.newMrr), expansionMrr: Number(input.form.expansionMrr),
-        contractionMrr: Number(input.form.contractionMrr), churnedMrr: Number(input.form.churnedMrr),
-        newCustomers: Number(input.form.newCustomers), churnedCustomers: Number(input.form.churnedCustomers),
-        totalCustomers: Number(input.form.totalCustomers), burnRate: Number(input.form.burnRate),
+        mrr: Number(input.form.mrr),
+        newMrr: Number(input.form.newMrr),
+        expansionMrr: Number(input.form.expansionMrr),
+        contractionMrr: Number(input.form.contractionMrr),
+        churnedMrr: Number(input.form.churnedMrr),
+        newCustomers: Number(input.form.newCustomers),
+        churnedCustomers: Number(input.form.churnedCustomers),
+        totalCustomers: Number(input.form.totalCustomers),
+        burnRate: Number(input.form.burnRate),
         cash: Number(input.form.cash),
         notes: input.form.notes || undefined,
       }),
@@ -147,10 +183,16 @@ export function Metrics() {
         input.field === 'notes' && input.value.trim() === '' ? undefined : numeric ? Number(input.value) : input.value;
       return api.post('/metrics/snapshot', {
         month: s.month.slice(0, 10),
-        mrr: s.mrr, newMrr: s.newMrr, expansionMrr: s.expansionMrr,
-        contractionMrr: s.contractionMrr, churnedMrr: s.churnedMrr,
-        newCustomers: s.newCustomers, churnedCustomers: s.churnedCustomers,
-        totalCustomers: s.totalCustomers, burnRate: s.burnRate, cash: s.cash,
+        mrr: s.mrr,
+        newMrr: s.newMrr,
+        expansionMrr: s.expansionMrr,
+        contractionMrr: s.contractionMrr,
+        churnedMrr: s.churnedMrr,
+        newCustomers: s.newCustomers,
+        churnedCustomers: s.churnedCustomers,
+        totalCustomers: s.totalCustomers,
+        burnRate: s.burnRate,
+        cash: s.cash,
         notes: s.notes,
         [input.field]: value,
       });
@@ -216,31 +258,45 @@ export function Metrics() {
   };
 
   const inputClassNames = {
-    inputWrapper:
-      'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
+    inputWrapper: 'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
     label: 'text-runway-muted',
   };
 
   function cellValue(s: Snapshot, field: EditableField): string {
     switch (field) {
-      case 'mrr': return `$${s.mrr.toLocaleString()}`;
-      case 'burnRate': return `$${s.burnRate.toLocaleString()}`;
-      case 'cash': return `$${s.cash.toLocaleString()}`;
-      case 'totalCustomers': return String(s.totalCustomers);
-      case 'notes': return s.notes ?? '';
+      case 'mrr':
+        return `$${s.mrr.toLocaleString()}`;
+      case 'burnRate':
+        return `$${s.burnRate.toLocaleString()}`;
+      case 'cash':
+        return `$${s.cash.toLocaleString()}`;
+      case 'totalCustomers':
+        return String(s.totalCustomers);
+      case 'notes':
+        return s.notes ?? '';
     }
   }
 
   const headerCols: JSX.Element[] = [
     <TableColumn key="month">MONTH</TableColumn>,
     ...editableFields.map((f) => (
-      <TableColumn key={f.key} align="end">{f.label.toUpperCase()}</TableColumn>
+      <TableColumn key={f.key} align="end">
+        {f.label.toUpperCase()}
+      </TableColumn>
     )),
-    <TableColumn key="runway" align="end">RUNWAY</TableColumn>,
-    <TableColumn key="trend" align="end">TREND</TableColumn>,
+    <TableColumn key="runway" align="end">
+      RUNWAY
+    </TableColumn>,
+    <TableColumn key="trend" align="end">
+      TREND
+    </TableColumn>,
   ];
   if (canEdit) {
-    headerCols.push(<TableColumn key="actions" align="end"> </TableColumn>);
+    headerCols.push(
+      <TableColumn key="actions" align="end">
+        {' '}
+      </TableColumn>,
+    );
   }
 
   return (
@@ -257,33 +313,133 @@ export function Metrics() {
           <div className="runway-sheen" />
           <div className="relative p-5">
             <form onSubmit={handleSubmit} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Input type="month" label="Month" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.month} onValueChange={(v) => setForm({ ...form, month: v })} isRequired />
-              <Input type="number" label="MRR" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.mrr} onValueChange={(v) => setForm({ ...form, mrr: v })} isRequired />
-              <Input type="number" label="New MRR" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.newMrr} onValueChange={(v) => setForm({ ...form, newMrr: v })} isRequired />
-              <Input type="number" label="Expansion MRR" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.expansionMrr} onValueChange={(v) => setForm({ ...form, expansionMrr: v })} isRequired />
-              <Input type="number" label="Contraction MRR" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.contractionMrr} onValueChange={(v) => setForm({ ...form, contractionMrr: v })} isRequired />
-              <Input type="number" label="Churned MRR" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.churnedMrr} onValueChange={(v) => setForm({ ...form, churnedMrr: v })} isRequired />
-              <Input type="number" label="New Customers" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.newCustomers} onValueChange={(v) => setForm({ ...form, newCustomers: v })} isRequired />
-              <Input type="number" label="Churned Customers" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.churnedCustomers} onValueChange={(v) => setForm({ ...form, churnedCustomers: v })} isRequired />
-              <Input type="number" label="Total Customers" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.totalCustomers} onValueChange={(v) => setForm({ ...form, totalCustomers: v })} isRequired />
-              <Input type="number" label="Burn Rate" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.burnRate} onValueChange={(v) => setForm({ ...form, burnRate: v })} isRequired />
-              <Input type="number" label="Cash" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.cash} onValueChange={(v) => setForm({ ...form, cash: v })} isRequired />
-              <Input label="Notes" size="sm" variant="bordered" classNames={inputClassNames}
-                value={form.notes} onValueChange={(v) => setForm({ ...form, notes: v })} />
+              <Input
+                type="month"
+                label="Month"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.month}
+                onValueChange={(v) => setForm({ ...form, month: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="MRR"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.mrr}
+                onValueChange={(v) => setForm({ ...form, mrr: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="New MRR"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.newMrr}
+                onValueChange={(v) => setForm({ ...form, newMrr: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Expansion MRR"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.expansionMrr}
+                onValueChange={(v) => setForm({ ...form, expansionMrr: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Contraction MRR"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.contractionMrr}
+                onValueChange={(v) => setForm({ ...form, contractionMrr: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Churned MRR"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.churnedMrr}
+                onValueChange={(v) => setForm({ ...form, churnedMrr: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="New Customers"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.newCustomers}
+                onValueChange={(v) => setForm({ ...form, newCustomers: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Churned Customers"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.churnedCustomers}
+                onValueChange={(v) => setForm({ ...form, churnedCustomers: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Total Customers"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.totalCustomers}
+                onValueChange={(v) => setForm({ ...form, totalCustomers: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Burn Rate"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.burnRate}
+                onValueChange={(v) => setForm({ ...form, burnRate: v })}
+                isRequired
+              />
+              <Input
+                type="number"
+                label="Cash"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.cash}
+                onValueChange={(v) => setForm({ ...form, cash: v })}
+                isRequired
+              />
+              <Input
+                label="Notes"
+                size="sm"
+                variant="bordered"
+                classNames={inputClassNames}
+                value={form.notes}
+                onValueChange={(v) => setForm({ ...form, notes: v })}
+              />
 
               <div className="col-span-2 md:col-span-4 flex items-center gap-3 mt-1">
-                <Button type="submit" color="primary" size="sm" isLoading={createSnapshot.isPending} className="bg-accent-gradient font-medium">
+                <Button
+                  type="submit"
+                  color="primary"
+                  size="sm"
+                  isLoading={createSnapshot.isPending}
+                  className="bg-accent-gradient font-medium"
+                >
                   {createSnapshot.isPending ? 'Saving…' : 'Add snapshot'}
                 </Button>
               </div>
@@ -318,9 +474,7 @@ export function Metrics() {
               tr: 'border-b border-runway-border/50 last:border-0',
             }}
           >
-            <TableHeader>
-              {headerCols}
-            </TableHeader>
+            <TableHeader>{headerCols}</TableHeader>
             <TableBody emptyContent="No snapshots yet." items={snapshots.slice().reverse()}>
               {(s) => {
                 const idx = snapshots.findIndex((x) => x.month === s.month);
@@ -351,7 +505,7 @@ export function Metrics() {
                           onPress={() => {
                             if (!canEdit) return;
                             setEditing({ month: s.month, field: f.key });
-                            setEditValue(f.key === 'notes' ? s.notes ?? '' : String(s[f.key as 'mrr']));
+                            setEditValue(f.key === 'notes' ? (s.notes ?? '') : String(s[f.key as 'mrr']));
                           }}
                           className="tabular-nums px-1.5 min-w-0 h-auto py-0.5 data-[hover=true]:text-runway-accent data-[hover=true]:bg-white/[0.04]"
                           title={canEdit ? 'Click to edit' : undefined}
@@ -361,7 +515,9 @@ export function Metrics() {
                       )}
                     </TableCell>
                   )),
-                  <TableCell key="runway" className="text-right">{s.derived.runwayMonths ?? '—'} mo</TableCell>,
+                  <TableCell key="runway" className="text-right">
+                    {s.derived.runwayMonths ?? '—'} mo
+                  </TableCell>,
                   <TableCell key="trend">
                     <div className="flex justify-end">
                       <MrrSparkline series={window} />
@@ -407,18 +563,19 @@ export function Metrics() {
                     </TableCell>,
                   );
                 }
-                return (
-                  <TableRow key={s.month}>
-                    {cells}
-                  </TableRow>
-                );
+                return <TableRow key={s.month}>{cells}</TableRow>;
               }}
             </TableBody>
           </Table>
         </div>
       </div>
 
-      <Modal isOpen={deleting !== null} onClose={() => setDeleting(null)} className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text" size="sm">
+      <Modal
+        isOpen={deleting !== null}
+        onClose={() => setDeleting(null)}
+        className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text"
+        size="sm"
+      >
         <ModalContent>
           <ModalHeader className="text-sm font-semibold">Delete snapshot?</ModalHeader>
           <ModalBody className="text-sm text-runway-muted">

@@ -70,9 +70,7 @@ describe('CohortsRepository', () => {
 
       await repo.aggregateRetention('real-co-1');
 
-      expect(prisma.customer.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { companyId: 'real-co-1' } }),
-      );
+      expect(prisma.customer.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: { companyId: 'real-co-1' } }));
     });
 
     it('returns the aggregated cells the database produced', async () => {
@@ -135,10 +133,7 @@ describe('CohortsRepository', () => {
     it('is deterministic', async () => {
       const { repo } = build();
 
-      const [a, b] = await Promise.all([
-        repo.aggregateRetention('demo-company-steady'),
-        repo.aggregateRetention('demo-company-steady'),
-      ]);
+      const [a, b] = await Promise.all([repo.aggregateRetention('demo-company-steady'), repo.aggregateRetention('demo-company-steady')]);
 
       expect(a).toEqual(b);
     });

@@ -1,10 +1,14 @@
-import type { ReactNode} from 'react';
+import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
 
 type ToastVariant = 'success' | 'error' | 'info';
-interface ToastItem { id: string; message: string; variant: ToastVariant; }
+interface ToastItem {
+  id: string;
+  message: string;
+  variant: ToastVariant;
+}
 
 interface ToastContextValue {
   push: (message: string, variant?: ToastVariant) => void;

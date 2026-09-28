@@ -114,8 +114,7 @@ describe('demo data determinism', () => {
       for (const entry of generateCohorts('steady', 6, 6)) {
         entry.values.forEach((value, index) => {
           expect(value.month.getUTCDate()).toBe(1);
-          const expected =
-            new Date(Date.UTC(entry.signupMonth.getUTCFullYear(), entry.signupMonth.getUTCMonth() + index, 1));
+          const expected = new Date(Date.UTC(entry.signupMonth.getUTCFullYear(), entry.signupMonth.getUTCMonth() + index, 1));
           expect(value.month.toISOString()).toBe(expected.toISOString());
         });
       }

@@ -21,8 +21,7 @@ const defaultSections: NarrativeSection[] = [
 ];
 
 const inputClassNames = {
-  inputWrapper:
-    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
+  inputWrapper: 'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
   label: 'text-runway-muted',
 };
 
@@ -31,9 +30,7 @@ export function InvestorUpdate() {
   const { push } = useToast();
   const queryClient = useQueryClient();
   const [sections, setSections] = useState(defaultSections);
-  const [periodLabel, setPeriodLabel] = useState(
-    new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-  );
+  const [periodLabel, setPeriodLabel] = useState(new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
   /**
    * A two-second acknowledgement of the copy, not server state. A mutation stays
    * successful for as long as the page is open, so the label has to be timed by
@@ -103,12 +100,15 @@ export function InvestorUpdate() {
   }
 
   return (
-    <motion.div className="flex flex-col gap-6 max-w-2xl" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+    <motion.div
+      className="flex flex-col gap-6 max-w-2xl"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">Investor Update Builder</h2>
-        <p className="text-sm text-runway-muted">
-          The dashboard is the input; this PDF is the product investors actually read.
-        </p>
+        <p className="text-sm text-runway-muted">The dashboard is the input; this PDF is the product investors actually read.</p>
       </div>
 
       <Input
@@ -152,7 +152,14 @@ export function InvestorUpdate() {
       ))}
 
       <div>
-        <Button color="primary" size="sm" isLoading={exportPdf.isPending} onPress={() => exportPdf.mutate({ periodLabel, sections })} startContent={!exportPdf.isPending && <FileDown size={14} />} className="bg-accent-gradient font-medium">
+        <Button
+          color="primary"
+          size="sm"
+          isLoading={exportPdf.isPending}
+          onPress={() => exportPdf.mutate({ periodLabel, sections })}
+          startContent={!exportPdf.isPending && <FileDown size={14} />}
+          className="bg-accent-gradient font-medium"
+        >
           {exportPdf.isPending ? 'Generating…' : 'Export PDF'}
         </Button>
         <Button

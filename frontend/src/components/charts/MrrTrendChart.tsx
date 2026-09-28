@@ -24,7 +24,7 @@ export function MrrTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
         payload={payload}
         label={label}
         formatter={(v) => `$${v.toLocaleString()}`}
-        note={active ? point?.note ?? undefined : undefined}
+        note={active ? (point?.note ?? undefined) : undefined}
       />
     );
   };
@@ -40,7 +40,15 @@ export function MrrTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
+        />
         <YAxis
           tick={axisTickStyle}
           axisLine={false}
@@ -51,7 +59,17 @@ export function MrrTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
         />
         <Tooltip content={renderTooltip} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
         {/* Glow pass under the main line */}
-        <Area type="monotone" dataKey="mrr" stroke={chartColors.accent} strokeWidth={7} strokeOpacity={0.18} fill="none" dot={false} activeDot={false} isAnimationActive={false} />
+        <Area
+          type="monotone"
+          dataKey="mrr"
+          stroke={chartColors.accent}
+          strokeWidth={7}
+          strokeOpacity={0.18}
+          fill="none"
+          dot={false}
+          activeDot={false}
+          isAnimationActive={false}
+        />
         <Area
           type="monotone"
           dataKey="mrr"
@@ -67,7 +85,13 @@ export function MrrTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
           stroke={chartColors.accent}
           strokeOpacity={0.35}
           strokeDasharray="2 4"
-          label={{ value: `$${(last / 1000).toFixed(0)}k`, position: 'insideTopRight', fill: chartColors.accent, fontSize: 11, fontWeight: 600 }}
+          label={{
+            value: `$${(last / 1000).toFixed(0)}k`,
+            position: 'insideTopRight',
+            fill: chartColors.accent,
+            fontSize: 11,
+            fontWeight: 600,
+          }}
         />
         {noted.map((d) => (
           <ReferenceDot

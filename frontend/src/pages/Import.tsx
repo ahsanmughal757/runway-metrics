@@ -1,4 +1,4 @@
-import type { ChangeEvent} from 'react';
+import type { ChangeEvent } from 'react';
 import { useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -97,12 +97,17 @@ export function Import() {
   };
 
   return (
-    <motion.div className="flex flex-col gap-6" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+    <motion.div
+      className="flex flex-col gap-6"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">CSV Import</h2>
         <p className="text-sm text-runway-muted">
-          Columns required: month, mrr, newMrr, expansionMrr, contractionMrr, churnedMrr, newCustomers,
-          churnedCustomers, totalCustomers, burnRate, cash.
+          Columns required: month, mrr, newMrr, expansionMrr, contractionMrr, churnedMrr, newCustomers, churnedCustomers, totalCustomers,
+          burnRate, cash.
         </p>
       </div>
 
@@ -117,7 +122,11 @@ export function Import() {
         <div className="relative p-12 flex flex-col items-center justify-center gap-3">
           <div className="relative">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-runway-accent/[0.16] to-runway-accent2/[0.08] border border-runway-accent/20 flex items-center justify-center">
-              {fileName ? <FileCheck2 size={22} className="text-runway-positive" /> : <UploadCloud size={22} className="text-runway-accent" />}
+              {fileName ? (
+                <FileCheck2 size={22} className="text-runway-positive" />
+              ) : (
+                <UploadCloud size={22} className="text-runway-accent" />
+              )}
             </div>
             <div className="absolute inset-0 rounded-2xl bg-runway-accent/10 blur-xl -z-10" />
           </div>
@@ -144,7 +153,13 @@ export function Import() {
                   ))}
                 </ul>
               ) : (
-                <Button color="primary" size="sm" className="w-fit bg-accent-gradient font-medium" isLoading={commitImport.isPending} onPress={confirmCommit}>
+                <Button
+                  color="primary"
+                  size="sm"
+                  className="w-fit bg-accent-gradient font-medium"
+                  isLoading={commitImport.isPending}
+                  onPress={confirmCommit}
+                >
                   {commitImport.isPending ? 'Importing…' : 'Confirm & commit'}
                 </Button>
               )}

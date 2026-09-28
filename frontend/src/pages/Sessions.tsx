@@ -77,7 +77,13 @@ export function Sessions() {
   const { push } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: sessions, isPending, isError, error, refetch } = useQuery({
+  const {
+    data: sessions,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     // `authKeys`, not `companyKeys`: `/auth/sessions` carries `AuthGuard` and no
     // `CompanyScopeGuard`, and answers from the caller's own sessions, so the
     // company is not part of what this request depends on. A company-scoped key
@@ -111,10 +117,7 @@ export function Sessions() {
       // than a tenant, so there is no company to capture in the variables here —
       // which is what makes this safe to fire without threading one through.
       queryClient.setQueryData<SessionRow[]>(authKeys.sessions(), (prev) => prev?.filter((s) => s.id !== row.id));
-      push(
-        row.isCurrent ? 'This device was signed out. You will be asked to sign in again.' : 'That device was signed out.',
-        'success',
-      );
+      push(row.isCurrent ? 'This device was signed out. You will be asked to sign in again.' : 'That device was signed out.', 'success');
     },
     onError: (e: unknown) => {
       push((e as Error).message, 'error');
@@ -129,8 +132,8 @@ export function Sessions() {
     return (
       <p className="text-sm text-runway-muted px-1 py-6 text-center">
         Sessions are only tracked when the API runs against a database. Start it with{' '}
-        <code className="text-xs bg-white/[0.03] border border-runway-border/60 rounded-md px-1.5 py-0.5">ENABLE_DATABASE=true</code>{' '}
-        to see this list.
+        <code className="text-xs bg-white/[0.03] border border-runway-border/60 rounded-md px-1.5 py-0.5">ENABLE_DATABASE=true</code> to see
+        this list.
       </p>
     );
   }
@@ -149,8 +152,8 @@ export function Sessions() {
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">Signed-in devices</h2>
         <p className="text-sm text-runway-muted mt-0.5">
-          Every place this account is currently signed in. Signing one out revokes its session immediately - useful if you
-          do not recognise a row.
+          Every place this account is currently signed in. Signing one out revokes its session immediately - useful if you do not recognise
+          a row.
         </p>
       </motion.div>
 

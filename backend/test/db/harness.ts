@@ -81,11 +81,7 @@ export interface Registered {
 }
 
 /** Registers a user (who becomes the company OWNER) and returns usable auth. */
-export async function registerOwner(
-  app: INestApplication,
-  email = uniqueEmail('owner'),
-  companyName = 'Test Co',
-): Promise<Registered> {
+export async function registerOwner(app: INestApplication, email = uniqueEmail('owner'), companyName = 'Test Co'): Promise<Registered> {
   const res = await request(app.getHttpServer())
     .post('/api/auth/register')
     .send({ email, password: PASSWORD, name: 'Test User', companyName })

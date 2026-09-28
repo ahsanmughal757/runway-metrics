@@ -150,7 +150,10 @@ export class CredentialCryptoService {
       // Deliberately not distinguishing "wrong key" from "altered bytes": the
       // caller has one remedy either way, and naming the wrong one sends
       // someone re-encrypting rows that were never tampered with.
-      throw new DecryptionFailedError('The stored value failed its integrity check. It was either altered in place or encrypted under a key that is no longer available.', { cause });
+      throw new DecryptionFailedError(
+        'The stored value failed its integrity check. It was either altered in place or encrypted under a key that is no longer available.',
+        { cause },
+      );
     }
 
     return plaintext.toString('utf8');
@@ -183,7 +186,12 @@ export class CredentialCryptoService {
     if (!keyId) {
       throw new MalformedEnvelopeError('Encrypted value names no key.');
     }
-    return { keyId, iv: this.fromBase64(iv, 'iv'), tag: this.fromBase64(tag, 'tag'), ciphertext: this.fromBase64(ciphertext, 'ciphertext') };
+    return {
+      keyId,
+      iv: this.fromBase64(iv, 'iv'),
+      tag: this.fromBase64(tag, 'tag'),
+      ciphertext: this.fromBase64(ciphertext, 'ciphertext'),
+    };
   }
 
   private fromBase64(value: string, label: string): Buffer {
@@ -236,7 +244,9 @@ export class CredentialCryptoService {
     // that actually detects the truncation.
     const key = Buffer.from(hex, 'hex');
     if (key.length !== KEY_BYTES || key.toString('hex') !== hex.toLowerCase()) {
-      throw new CredentialCryptoError(`${label} must be exactly ${KEY_BYTES * 2} hex characters, which is exactly ${KEY_BYTES} bytes for AES-256. Generate one with scripts/generate-secrets.mjs.`);
+      throw new CredentialCryptoError(
+        `${label} must be exactly ${KEY_BYTES * 2} hex characters, which is exactly ${KEY_BYTES} bytes for AES-256. Generate one with scripts/generate-secrets.mjs.`,
+      );
     }
     return key;
   }

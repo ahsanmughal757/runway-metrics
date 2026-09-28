@@ -27,7 +27,11 @@ const OTHER_PERSONAS: Record<string, { key: string; label: string }[]> = {
   ],
 };
 
-interface ComparePoint { month: string; ownMrr: number; compareMrr?: number }
+interface ComparePoint {
+  month: string;
+  ownMrr: number;
+  compareMrr?: number;
+}
 
 interface CompareResponse {
   available: boolean;
@@ -40,7 +44,7 @@ export function Compare() {
   const { activeCompanyId } = useCompany();
   const [chosen, setChosen] = useState<string | null>(null);
 
-  const options = activeCompanyId ? OTHER_PERSONAS[activeCompanyId] ?? [] : [];
+  const options = activeCompanyId ? (OTHER_PERSONAS[activeCompanyId] ?? []) : [];
 
   /**
    * The selected peer, resolved from `options` on every render rather than
@@ -60,7 +64,13 @@ export function Compare() {
    */
   const comparePersona = chosen && options.some((o) => o.key === chosen) ? chosen : (options[0]?.key ?? null);
 
-  const { data: own, isPending: ownPending, isError: ownFailed, error: ownError, refetch: refetchOwn } = useQuery({
+  const {
+    data: own,
+    isPending: ownPending,
+    isError: ownFailed,
+    error: ownError,
+    refetch: refetchOwn,
+  } = useQuery({
     queryKey: companyKeys.dashboard(activeCompanyId),
     queryFn: ({ signal }) => api.get<DashboardResponse>('/metrics/dashboard', signal),
     enabled: activeCompanyId !== null,
@@ -169,7 +179,11 @@ export function Compare() {
                 <span className="h-0.5 w-4 rounded-full bg-runway-accent" /> This company
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-0.5 w-4 rounded-full bg-runway-amber" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #f6b93b 0 4px, transparent 4px 7px)' }} /> {compareLabel}
+                <span
+                  className="h-0.5 w-4 rounded-full bg-runway-amber"
+                  style={{ backgroundImage: 'repeating-linear-gradient(90deg, #f6b93b 0 4px, transparent 4px 7px)' }}
+                />{' '}
+                {compareLabel}
               </span>
             </div>
           </div>
@@ -182,31 +196,48 @@ export function Compare() {
               <ChartCardSkeleton height={340} />
             ) : (
               <ResponsiveContainer width="100%" height={340}>
-              <LineChart data={merged} margin={{ top: 10, right: 14, left: 0, bottom: 0 }}>
-                <CartesianGrid {...gridStyle} />
-                <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
-                <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
-                <Tooltip content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
-                <Line
-                  type="monotone"
-                  dataKey="ownMrr"
-                  name="This company"
-                  stroke={chartColors.accent}
-                  strokeWidth={2.5}
-                  dot={false}
-                  activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.accent, strokeWidth: 2.5 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="compareMrr"
-                  name={compareLabel}
-                  stroke={chartColors.amber}
-                  strokeWidth={2.5}
-                  strokeDasharray="5 3"
-                  dot={false}
-                  activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.amber, strokeWidth: 2.5 }}
-                />
-              </LineChart>
+                <LineChart data={merged} margin={{ top: 10, right: 14, left: 0, bottom: 0 }}>
+                  <CartesianGrid {...gridStyle} />
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={monthLabel}
+                    tick={axisTickStyle}
+                    axisLine={false}
+                    tickLine={false}
+                    tickMargin={8}
+                    minTickGap={24}
+                  />
+                  <YAxis
+                    tick={axisTickStyle}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                    width={52}
+                  />
+                  <Tooltip
+                    content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} />}
+                    cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="ownMrr"
+                    name="This company"
+                    stroke={chartColors.accent}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.accent, strokeWidth: 2.5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="compareMrr"
+                    name={compareLabel}
+                    stroke={chartColors.amber}
+                    strokeWidth={2.5}
+                    strokeDasharray="5 3"
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.amber, strokeWidth: 2.5 }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             )}
           </div>

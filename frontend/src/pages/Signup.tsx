@@ -1,4 +1,4 @@
-import type { FormEvent} from 'react';
+import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,8 +8,7 @@ import { useAuth } from '../lib/AuthContext';
 import { useToast } from '../lib/ToastContext';
 
 const inputClassNames = {
-  inputWrapper:
-    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
+  inputWrapper: 'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
   label: 'text-runway-muted',
 };
 
@@ -43,7 +42,12 @@ export function Signup() {
     <div className="relative min-h-screen flex items-center justify-center px-4 overflow-hidden">
       <div className="pointer-events-none absolute -top-24 -left-24 w-[28rem] h-[28rem] rounded-full bg-runway-accent/[0.1] blur-[110px]" />
       <div className="pointer-events-none absolute -bottom-32 -right-24 w-[28rem] h-[28rem] rounded-full bg-runway-accent2/[0.08] blur-[120px]" />
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="relative w-full max-w-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+        className="relative w-full max-w-sm"
+      >
         <div className="flex items-center gap-2.5 justify-center mb-8">
           <div className="w-9 h-9 rounded-xl bg-accent-gradient flex items-center justify-center shadow-glow">
             <TrendingUp size={17} className="text-white" />
@@ -70,15 +74,38 @@ export function Signup() {
                 isRequired
                 description="The workspace you will own. You can invite teammates once you are in."
               />
-              <Input label="Email" type="email" size="sm" variant="bordered" value={email} onValueChange={setEmail} classNames={inputClassNames} isRequired />
-              <Input label="Password" type="password" size="sm" variant="bordered" value={password} onValueChange={setPassword} classNames={inputClassNames} isRequired minLength={8} description="Minimum 8 characters" />
+              <Input
+                label="Email"
+                type="email"
+                size="sm"
+                variant="bordered"
+                value={email}
+                onValueChange={setEmail}
+                classNames={inputClassNames}
+                isRequired
+              />
+              <Input
+                label="Password"
+                type="password"
+                size="sm"
+                variant="bordered"
+                value={password}
+                onValueChange={setPassword}
+                classNames={inputClassNames}
+                isRequired
+                minLength={8}
+                description="Minimum 8 characters"
+              />
               {error && <p className="text-xs text-runway-negative">{error}</p>}
               <Button type="submit" color="primary" size="sm" isLoading={submitting} fullWidth className="bg-accent-gradient font-medium">
                 Create account
               </Button>
             </form>
             <p className="text-xs text-runway-muted text-center">
-              Already have an account? <Link to="/login" className="text-runway-accent font-medium">Sign in</Link>
+              Already have an account?{' '}
+              <Link to="/login" className="text-runway-accent font-medium">
+                Sign in
+              </Link>
             </p>
           </div>
         </div>

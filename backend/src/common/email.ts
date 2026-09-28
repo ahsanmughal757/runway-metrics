@@ -24,8 +24,7 @@ export function normalizeEmail(value: string): string {
  * row can never be written that `normalizeEmail` would later change, which is
  * the whole reason the database rejects unnormalised addresses.
  */
-export const Trim = ({ value }: { value: unknown }): unknown =>
-  typeof value === 'string' ? value.trim() : value;
+export const Trim = ({ value }: { value: unknown }): unknown => (typeof value === 'string' ? value.trim() : value);
 
 /** Lower bound only. Length limits are enforced by the DTOs. */
 export function isValidEmail(value: string): boolean {

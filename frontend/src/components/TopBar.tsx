@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCompany } from '../lib/CompanyContext';
 import { useAuth } from '../lib/AuthContext';
 import { ROLE_LABELS, ROLES, type Role } from '../lib/permissions';
-import type { AppTheme} from '../lib/theme';
+import type { AppTheme } from '../lib/theme';
 import { applyTheme, getStoredTheme, setStoredTheme } from '../lib/theme';
 import { NotificationsBell } from './NotificationsBell';
 import { DataAsOf } from './DataAsOf';
@@ -137,7 +137,8 @@ export function TopBar() {
           isSelected={!dark}
           onChange={(e) => handleThemeChange(e.target.checked)}
           thumbIcon={({ isSelected, className }) =>
-            isSelected ? <Sun className={className} size={12} /> : <Moon className={className} size={12} />}
+            isSelected ? <Sun className={className} size={12} /> : <Moon className={className} size={12} />
+          }
           classNames={{
             wrapper: 'group-data-[selected=true]:bg-runway-accent',
           }}

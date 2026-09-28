@@ -50,14 +50,7 @@ export type Permission = (typeof PERMISSIONS)[number];
  */
 export const KEY_FORBIDDEN_SCOPES: readonly Permission[] = ['apiKeys:manage'];
 
-const READ_ONLY: readonly Permission[] = [
-  'company:read',
-  'members:read',
-  'metrics:read',
-  'customers:read',
-  'reports:read',
-  'audit:read',
-];
+const READ_ONLY: readonly Permission[] = ['company:read', 'members:read', 'metrics:read', 'customers:read', 'reports:read', 'audit:read'];
 
 /**
  * The one place role semantics are defined.
@@ -82,8 +75,31 @@ export const ROLE_PERMISSIONS: Readonly<Record<MembershipRole, readonly Permissi
   // password", which is worse. `company:delete` is still unreachable through a
   // key at issuance time -- see KEY_FORBIDDEN_SCOPES-adjacent checks in
   // api-keys.service.ts.
-  OWNER: [...READ_ONLY, 'company:update', 'company:delete', 'members:invite', 'members:updateRole', 'members:remove', 'metrics:write', 'customers:write', 'reports:generate', 'reports:share', 'apiKeys:manage'],
-  ADMIN: [...READ_ONLY, 'company:update', 'members:invite', 'members:updateRole', 'members:remove', 'metrics:write', 'customers:write', 'reports:generate', 'reports:share', 'apiKeys:manage'],
+  OWNER: [
+    ...READ_ONLY,
+    'company:update',
+    'company:delete',
+    'members:invite',
+    'members:updateRole',
+    'members:remove',
+    'metrics:write',
+    'customers:write',
+    'reports:generate',
+    'reports:share',
+    'apiKeys:manage',
+  ],
+  ADMIN: [
+    ...READ_ONLY,
+    'company:update',
+    'members:invite',
+    'members:updateRole',
+    'members:remove',
+    'metrics:write',
+    'customers:write',
+    'reports:generate',
+    'reports:share',
+    'apiKeys:manage',
+  ],
   ANALYST: [...READ_ONLY, 'metrics:write', 'customers:write', 'reports:generate'],
   VIEWER: READ_ONLY,
 };

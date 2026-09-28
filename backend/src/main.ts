@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { Express } from 'express';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -8,6 +9,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { env, isProduction } from './config/env';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { MetricsFilter } from './common/observability/metrics.filter';
 import { requestIdMiddleware } from './common/logging/request-id.middleware';
 
 async function bootstrap() {
@@ -26,6 +28,20 @@ async function bootstrap() {
   // First, so the correlation id exists before anything can log or fail, and
   // so the response always carries X-Request-Id.
   app.use(requestIdMiddleware);
+
+  // How many proxies to believe, so `req.ip` is the client rather than whatever
+  // the last hop put in `X-Forwarded-For`. This is a rate-limit and audit-log
+  // control, not a cosmetic one: see the TRUST_PROXY_HOPS comment in env.ts for
+  // why trusting the whole chain by default would let anyone evade the login
+  // rate limit with a header. Set before anything that reads the address.
+  //
+  // On the Express instance, not `app.set` — that is for custom DI tokens and
+  // never reaches the HTTP server. `getInstance()` is declared `any`, so it is
+  // narrowed to `Express`: an untyped call in the one file that sets the trust
+  // boundary is exactly what the `no-unsafe-call` rules exist to catch, and the
+  // cast is honest because the app is built on the Express adapter.
+  const httpServer = app.getHttpAdapter().getInstance() as Express;
+  httpServer.set('trust proxy', env.TRUST_PROXY_HOPS);
 
   // Must precede routing so every response carries the hardening headers,
   // including the CORS preflight that never reaches a guard.
@@ -69,7 +85,11 @@ async function bootstrap() {
 
   // ThrottlerGuard is registered as APP_GUARD in app.module so it receives its
   // options through DI rather than a half-constructed `new ThrottlerGuard()`.
-  app.useGlobalFilters(new AllExceptionsFilter());
+  // Wraps, rather than replaces, the existing filter: Nest runs the first
+  // matching global filter and none of the rest, so `MetricsFilter` counts and
+  // then delegates. It is registered here so the pair behaves exactly as the
+  // single filter did — see its constructor for why the delegation is required.
+  app.useGlobalFilters(new MetricsFilter(new AllExceptionsFilter()));
 
   app.setGlobalPrefix('api', { exclude: ['health', 'health/ready'] });
 

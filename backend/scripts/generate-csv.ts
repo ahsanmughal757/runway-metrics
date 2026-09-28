@@ -20,15 +20,37 @@ const outPath = arg('out', `./${persona}-snapshots.csv`);
 const months = Number(arg('months', '24'));
 
 const rows = generateSnapshots(persona, months);
-const header = ['month', 'mrr', 'newMrr', 'expansionMrr', 'contractionMrr', 'churnedMrr', 'newCustomers', 'churnedCustomers', 'totalCustomers', 'burnRate', 'cash'];
+const header = [
+  'month',
+  'mrr',
+  'newMrr',
+  'expansionMrr',
+  'contractionMrr',
+  'churnedMrr',
+  'newCustomers',
+  'churnedCustomers',
+  'totalCustomers',
+  'burnRate',
+  'cash',
+];
 const lines = [header.join(',')];
 
 for (const r of rows) {
-  lines.push([
-    r.month.toISOString().slice(0, 10),
-    r.mrr, r.newMrr, r.expansionMrr, r.contractionMrr, r.churnedMrr,
-    r.newCustomers, r.churnedCustomers, r.totalCustomers, r.burnRate, r.cash,
-  ].join(','));
+  lines.push(
+    [
+      r.month.toISOString().slice(0, 10),
+      r.mrr,
+      r.newMrr,
+      r.expansionMrr,
+      r.contractionMrr,
+      r.churnedMrr,
+      r.newCustomers,
+      r.churnedCustomers,
+      r.totalCustomers,
+      r.burnRate,
+      r.cash,
+    ].join(','),
+  );
 }
 
 fs.writeFileSync(outPath, lines.join('\n'));

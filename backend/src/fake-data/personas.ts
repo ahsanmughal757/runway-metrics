@@ -4,11 +4,11 @@ export interface PersonaConfig {
   key: PersonaKey;
   companyName: string;
   monthlyGrowthRange: [number, number]; // MoM % as decimal, applies while "in growth phase"
-  plateauMonth?: number;                // month index where growth decelerates (hypergrowth only)
-  baseChurnRate: number;                // monthly logo churn, decimal
-  churnDrift: number;                   // added to churn per month once past plateau/decline trigger
+  plateauMonth?: number; // month index where growth decelerates (hypergrowth only)
+  baseChurnRate: number; // monthly logo churn, decimal
+  churnDrift: number; // added to churn per month once past plateau/decline trigger
   burnStepUpEveryMonths: [number, number]; // range of months between hiring-wave step-ups
-  burnStepUpPct: [number, number];      // % burn increase per step
+  burnStepUpPct: [number, number]; // % burn increase per step
   startingMrr: number;
   startingCash: number;
   /** Gross spend per month before revenue offsets it. Explicit so a persona is self-documenting. */
@@ -23,10 +23,10 @@ export interface PersonaConfig {
    * from flatlining at zero burn halfway through the series.
    */
   reinvestmentRatio: number;
-  expansionMrrRate: number;             // expansion as % of starting MRR, decimal (0 for struggling)
-  cohortSize: [number, number];         // new customers per cohort month
-  cohortEarlyChurnMultiplier: number;   // multiplier on churn for months 0-2 of a cohort's life
-  eventMonths: number[];                // months with a "price change" style churn spike
+  expansionMrrRate: number; // expansion as % of starting MRR, decimal (0 for struggling)
+  cohortSize: [number, number]; // new customers per cohort month
+  cohortEarlyChurnMultiplier: number; // multiplier on churn for months 0-2 of a cohort's life
+  eventMonths: number[]; // months with a "price change" style churn spike
 }
 
 /**

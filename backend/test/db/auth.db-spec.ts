@@ -101,25 +101,16 @@ describe('auth and tenancy', () => {
       expect(row.email).toBe(normalized);
 
       // And it is the same identity, not a second one.
-      await request(server())
-        .post('/api/auth/register')
-        .send({ email: raw, password: PASSWORD, companyName: 'Acme Two' })
-        .expect(409);
+      await request(server()).post('/api/auth/register').send({ email: raw, password: PASSWORD, companyName: 'Acme Two' }).expect(409);
       expect(await prisma.user.count({ where: { email: normalized } })).toBe(1);
     });
 
     it('refuses a company name that is too short to be a name', async () => {
-      await request(server())
-        .post('/api/auth/register')
-        .send({ email: uniqueEmail(), password: PASSWORD, companyName: 'A' })
-        .expect(400);
+      await request(server()).post('/api/auth/register').send({ email: uniqueEmail(), password: PASSWORD, companyName: 'A' }).expect(400);
     });
 
     it('rejects a weak password', async () => {
-      await request(server())
-        .post('/api/auth/register')
-        .send({ email: uniqueEmail(), password: 'short', companyName: 'Acme' })
-        .expect(400);
+      await request(server()).post('/api/auth/register').send({ email: uniqueEmail(), password: 'short', companyName: 'Acme' }).expect(400);
     });
 
     it('rejects unknown fields rather than silently ignoring them', async () => {
@@ -131,10 +122,7 @@ describe('auth and tenancy', () => {
 
     it('leaves no user behind when the request is rejected', async () => {
       const before = await prisma.user.count();
-      await request(server())
-        .post('/api/auth/register')
-        .send({ email: uniqueEmail(), password: PASSWORD, companyName: '' })
-        .expect(400);
+      await request(server()).post('/api/auth/register').send({ email: uniqueEmail(), password: PASSWORD, companyName: '' }).expect(400);
       // A rejected signup must not create a user with no way to reach a company.
       expect(await prisma.user.count()).toBe(before);
     });
@@ -143,14 +131,9 @@ describe('auth and tenancy', () => {
   describe('login', () => {
     it('issues a token that identifies the user but carries no role', async () => {
       const owner = await registerOwner(app);
-      const login = await request(server())
-        .post('/api/auth/login')
-        .send({ email: owner.email, password: PASSWORD })
-        .expect(200);
+      const login = await request(server()).post('/api/auth/login').send({ email: owner.email, password: PASSWORD }).expect(200);
 
-      const claims = JSON.parse(
-        Buffer.from(login.body.accessToken.split('.')[1], 'base64url').toString('utf8'),
-      ) as Record<string, unknown>;
+      const claims = JSON.parse(Buffer.from(login.body.accessToken.split('.')[1], 'base64url').toString('utf8')) as Record<string, unknown>;
 
       // The whole point of moving off token-embedded roles: a token must not be
       // able to assert authority, or it outlives the membership that granted it.
@@ -162,10 +145,7 @@ describe('auth and tenancy', () => {
 
     it('accepts a differently-cased email', async () => {
       const owner = await registerOwner(app);
-      await request(server())
-        .post('/api/auth/login')
-        .send({ email: owner.email.toUpperCase(), password: PASSWORD })
-        .expect(200);
+      await request(server()).post('/api/auth/login').send({ email: owner.email.toUpperCase(), password: PASSWORD }).expect(200);
     });
 
     it('gives the same message for an unknown user and a wrong password', async () => {
@@ -194,10 +174,7 @@ describe('auth and tenancy', () => {
       const owner = await registerOwner(app);
       // No X-Company-Id: the switcher has to work before a company is chosen,
       // so the list endpoint must not demand one.
-      const res = await request(server())
-        .get('/api/companies')
-        .set('Authorization', `Bearer ${owner.accessToken}`)
-        .expect(200);
+      const res = await request(server()).get('/api/companies').set('Authorization', `Bearer ${owner.accessToken}`).expect(200);
       expect(res.body).toHaveLength(1);
       expect(res.body[0].id).toBe(owner.companyId);
     });
@@ -208,10 +185,7 @@ describe('auth and tenancy', () => {
       // membership, so a single-company user still works. This pins that
       // default deliberately: it is a convenience, not an authorisation, and
       // the header is what actually selects the tenant.
-      const res = await request(server())
-        .get('/api/companies/settings')
-        .set('Authorization', `Bearer ${owner.accessToken}`)
-        .expect(200);
+      const res = await request(server()).get('/api/companies/settings').set('Authorization', `Bearer ${owner.accessToken}`).expect(200);
       expect(res.body.id).toBe(owner.companyId);
     });
 
@@ -222,10 +196,7 @@ describe('auth and tenancy', () => {
         data: { userId: first.userId, companyId: second.companyId, role: 'VIEWER' },
       });
 
-      const res = await request(server())
-        .get('/api/companies/settings')
-        .set('Authorization', `Bearer ${first.accessToken}`)
-        .expect(200);
+      const res = await request(server()).get('/api/companies/settings').set('Authorization', `Bearer ${first.accessToken}`).expect(200);
       expect(res.body.id).toBe(first.companyId);
     });
 
@@ -495,8 +466,7 @@ describe('auth and tenancy', () => {
           .set('Authorization', `Bearer ${actor.accessToken}`)
           .set('X-Company-Id', companyId);
 
-      const stillMember = (membershipId: string) =>
-        prisma.companyMembership.count({ where: { id: membershipId } }).then((n) => n === 1);
+      const stillMember = (membershipId: string) => prisma.companyMembership.count({ where: { id: membershipId } }).then((n) => n === 1);
 
       it('refuses an ADMIN removing an OWNER, even when a second owner remains', async () => {
         // The escalation. Two owners means the "keep at least one owner"
@@ -659,7 +629,10 @@ describe('auth and tenancy', () => {
       // before/after, not just the new value: an audit trail that records only
       // the current state cannot answer "what did it used to be", which is the
       // only reason anyone reads one.
-      const diff = update.diff as { before: { name: string; runwayGreenMonths: number }; after: { name: string; runwayGreenMonths: number } };
+      const diff = update.diff as {
+        before: { name: string; runwayGreenMonths: number };
+        after: { name: string; runwayGreenMonths: number };
+      };
       expect(diff.before.name).toBe('Before');
       expect(diff.after.name).toBe('After');
       expect(diff.before.runwayGreenMonths).toBe(12);

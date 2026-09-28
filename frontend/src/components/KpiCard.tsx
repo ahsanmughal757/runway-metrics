@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Card, CardBody } from '@heroui/react';
-import type { LucideIcon} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface KpiCardProps {
@@ -26,8 +26,12 @@ export function KpiCard({ icon: Icon, label, value, secondary, trend, trendIsGoo
     trend === 'flat' || trend === 'none' || !trend
       ? 'text-runway-muted'
       : trend === 'up'
-      ? trendIsGood ? 'text-runway-positive' : 'text-runway-negative'
-      : trendIsGood ? 'text-runway-negative' : 'text-runway-positive';
+        ? trendIsGood
+          ? 'text-runway-positive'
+          : 'text-runway-negative'
+        : trendIsGood
+          ? 'text-runway-negative'
+          : 'text-runway-positive';
 
   const TrendIcon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus;
 

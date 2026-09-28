@@ -41,9 +41,30 @@ const DEMO_COMPANIES: CompanySummary[] = [
 // Static demo membership roster for BYPASS_AUTH mode. Mirrors the real role
 // matrix so demo mode cannot demonstrate a privilege the product withholds.
 const DEMO_MEMBERS: MemberSummary[] = [
-  { id: 'm-owner', name: 'Demo Owner', email: 'owner@runway.demo', role: MembershipRole.OWNER, joinedAt: '2024-01-02T00:00:00.000Z', isSelf: true },
-  { id: 'm-analyst', name: 'Ada Analyst', email: 'analyst@runway.demo', role: MembershipRole.ANALYST, joinedAt: '2024-02-15T00:00:00.000Z', isSelf: false },
-  { id: 'm-viewer', name: 'Vic Viewer', email: 'viewer@runway.demo', role: MembershipRole.VIEWER, joinedAt: '2024-03-01T00:00:00.000Z', isSelf: false },
+  {
+    id: 'm-owner',
+    name: 'Demo Owner',
+    email: 'owner@runway.demo',
+    role: MembershipRole.OWNER,
+    joinedAt: '2024-01-02T00:00:00.000Z',
+    isSelf: true,
+  },
+  {
+    id: 'm-analyst',
+    name: 'Ada Analyst',
+    email: 'analyst@runway.demo',
+    role: MembershipRole.ANALYST,
+    joinedAt: '2024-02-15T00:00:00.000Z',
+    isSelf: false,
+  },
+  {
+    id: 'm-viewer',
+    name: 'Vic Viewer',
+    email: 'viewer@runway.demo',
+    role: MembershipRole.VIEWER,
+    joinedAt: '2024-03-01T00:00:00.000Z',
+    isSelf: false,
+  },
 ];
 
 // In-memory settings store for demo/BYPASS_AUTH mode, keyed by companyId.
@@ -98,7 +119,16 @@ export class CompaniesRepository {
       if (!c) throw new NotFoundException('Company not found');
       return toSettings(c);
     }
-    return demoSettings.get(companyId) ?? { id: companyId, name: 'Demo Company', slug: 'demo', currency: 'USD', runwayGreenMonths: 12, runwayYellowMonths: 6 };
+    return (
+      demoSettings.get(companyId) ?? {
+        id: companyId,
+        name: 'Demo Company',
+        slug: 'demo',
+        currency: 'USD',
+        runwayGreenMonths: 12,
+        runwayYellowMonths: 6,
+      }
+    );
   }
 
   /**

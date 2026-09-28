@@ -10,7 +10,10 @@ import { ShareService } from './share.service';
 
 @Controller()
 export class ShareController {
-  constructor(private shares: ShareService, private metrics: MetricsService) {}
+  constructor(
+    private shares: ShareService,
+    private metrics: MetricsService,
+  ) {}
 
   @Post('reports/share-link')
   @UseGuards(AuthGuard, CompanyScopeGuard, PermissionsGuard)

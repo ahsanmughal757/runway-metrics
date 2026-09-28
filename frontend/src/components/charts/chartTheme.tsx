@@ -45,19 +45,13 @@ export function ChartTooltip({
   note?: string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
-  const renderedLabel = labelFormatter
-    ? labelFormatter(label as string)
-    : typeof label === 'number'
-      ? label
-      : monthLabel(label as string);
+  const renderedLabel = labelFormatter ? labelFormatter(label as string) : typeof label === 'number' ? label : monthLabel(label as string);
   return (
     <div
       className="min-w-[10rem] rounded-xl border border-runway-borderStrong/80 bg-runway-raised/95 px-3.5 py-2.5 backdrop-blur-xl"
       style={{ boxShadow: '0 16px 40px -12px rgba(0,0,0,0.7)' }}
     >
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-runway-muted">
-        {renderedLabel}
-      </p>
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-runway-muted">{renderedLabel}</p>
       {payload.map((p, i) => (
         <div key={`${String(p.dataKey)}-${i}`} className="flex items-center justify-between gap-5 py-0.5">
           <span className="flex items-center gap-1.5 text-xs text-runway-muted">

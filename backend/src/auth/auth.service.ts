@@ -160,9 +160,9 @@ export class AuthService {
     return this.sessions.listForUser(userId, currentFamilyId);
   }
 
-async revokeSession(userId: string, sessionId: string): Promise<void> {
-  this.requireDatabase('Sessions');
-  const removed = await this.sessions.revokeSession(userId, sessionId);
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    this.requireDatabase('Sessions');
+    const removed = await this.sessions.revokeSession(userId, sessionId);
     if (!removed) throw new UnauthorizedException('That session is no longer active');
   }
 

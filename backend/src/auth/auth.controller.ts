@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  Param,
-  Post,
-  Req,
-  Res,
-  UnauthorizedException,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { Transform } from 'class-transformer';
 import { Trim } from '../common/email';
 import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
@@ -24,8 +12,8 @@ import { env } from '../config/env';
 
 class RegisterDto {
   @Transform(Trim)
-
-  @IsEmail() email!: string;
+  @IsEmail()
+  email!: string;
   // Upper bound matters: without it a huge body of 'a' reaches bcrypt, which
   // is deliberately slow, and turns a public endpoint into a CPU DoS.
   @MinLength(8) @MaxLength(200) password!: string;
@@ -35,8 +23,9 @@ class RegisterDto {
 
 class LoginDto {
   @Transform(Trim)
-
-  @IsEmail() @MaxLength(254) email!: string;
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
   @MaxLength(200) password!: string;
 }
 

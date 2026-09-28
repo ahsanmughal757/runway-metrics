@@ -28,13 +28,7 @@ if (process.env.RUNWAY_SKIP_DOTENV !== 'true') {
 const NODE_ENVS = ['development', 'test', 'production'] as const;
 
 /** Rejects the well-known placeholder values that end up in git history and .env.example. */
-const REJECTED_SECRETS = new Set([
-  'dev-only-secret-change-me',
-  'change-me',
-  'secret',
-  'dev',
-  'insecure',
-]);
+const REJECTED_SECRETS = new Set(['dev-only-secret-change-me', 'change-me', 'secret', 'dev', 'insecure']);
 
 const secret = (min: number, label: string) =>
   z
@@ -57,7 +51,10 @@ const secret = (min: number, label: string) =>
 const hexKey32 = (label: string) =>
   z
     .string()
-    .regex(/^[0-9a-fA-F]{64}$/, `${label} must be 64 hex characters, which is exactly 32 bytes for AES-256 (see scripts/generate-secrets.mjs)`)
+    .regex(
+      /^[0-9a-fA-F]{64}$/,
+      `${label} must be 64 hex characters, which is exactly 32 bytes for AES-256 (see scripts/generate-secrets.mjs)`,
+    )
     .refine((v) => !REJECTED_SECRETS.has(v.toLowerCase()), {
       message: `${label} is a known placeholder value. Generate a real one (see scripts/generate-secrets.mjs)`,
     });
@@ -131,6 +128,26 @@ const schema = z
     CORS_ORIGINS: csv,
 
     /**
+     * How many reverse proxies sit in front of this process.
+     *
+     * Phase 6 puts nginx in front of the API, and Express needs to be told that
+     * or it will read `X-Forwarded-For` as a client-supplied header. That is not
+     * a theoretical concern here: the rate limiter (`RATE_LIMIT_MAX`,
+     * `AUTH_RATE_LIMIT_MAX`) keys on the client address, so an untrusted
+     * `X-Forwarded-For` means anyone can evade the login rate limit by sending
+     * a header. It also means the audit log records a spoofed address for every
+     * action.
+     *
+     * A number, not `true`. Express's `true` trusts the whole chain, which is
+     * only correct when you know how long the chain is; on a VPS where nginx
+     * is the only hop, 1 is the answer. Wrong in the permissive direction
+     * (claiming more hops than exist) is the dangerous one, so the default is
+     * the conservative `1` and the production refinement below refuses to leave
+     * it unset, because a misconfigured proxy is how the above happens silently.
+     */
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
+
+    /**
      * AES-256-GCM key for values the server must be able to read back.
      * Required in production. 64 hex characters = 32 bytes.
      *
@@ -144,7 +161,15 @@ const schema = z
      * Identifies the active key in every envelope this process writes. Defaults
      * to `k1` because a single-key deployment has nothing to name.
      */
-    CREDENTIALS_MASTER_KEY_ID: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).max(64).regex(/^[a-zA-Z0-9._-]+$/, 'CREDENTIALS_MASTER_KEY_ID may only contain letters, digits, dot, underscore and dash').default('k1')),
+    CREDENTIALS_MASTER_KEY_ID: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-zA-Z0-9._-]+$/, 'CREDENTIALS_MASTER_KEY_ID may only contain letters, digits, dot, underscore and dash')
+        .default('k1'),
+    ),
 
     /**
      * Retired keys, as `keyId:hex,keyId:hex`, accepted for *decryption only*.
@@ -182,7 +207,8 @@ const schema = z
       ctx.addIssue({
         code: 'custom',
         path: ['CREDENTIALS_MASTER_KEY'],
-        message: 'CREDENTIALS_MASTER_KEY is required in production (it encrypts share-link tokens and any connector credential added later)',
+        message:
+          'CREDENTIALS_MASTER_KEY is required in production (it encrypts share-link tokens and any connector credential added later)',
       });
     }
     if (cfg.CORS_ORIGINS.length === 0) {

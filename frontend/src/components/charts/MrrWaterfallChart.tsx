@@ -18,9 +18,7 @@ interface WaterfallEntry {
  * Start -> +New -> +Expansion -> -Contraction -> -Churned -> End.
  */
 export function MrrWaterfallChart({ snapshots }: { snapshots: Snapshot[] }) {
-  const [month, setMonth] = useState<string | undefined>(
-    snapshots.length > 0 ? snapshots[snapshots.length - 1].month : undefined,
-  );
+  const [month, setMonth] = useState<string | undefined>(snapshots.length > 0 ? snapshots[snapshots.length - 1].month : undefined);
 
   const idx = snapshots.findIndex((s) => s.month === month);
   const current = idx >= 0 ? snapshots[idx] : null;
@@ -32,10 +30,34 @@ export function MrrWaterfallChart({ snapshots }: { snapshots: Snapshot[] }) {
     const endMrr = current.mrr;
     const segs: { name: string; base: number; value: number; fill: string; display: string }[] = [
       { name: 'Start', base: 0, value: startMrr, fill: chartColors.accent, display: `$${startMrr.toLocaleString()}` },
-      { name: 'New MRR', base: startMrr, value: current.newMrr, fill: chartColors.positive, display: `+$${current.newMrr.toLocaleString()}` },
-      { name: 'Expansion', base: startMrr + current.newMrr, value: current.expansionMrr, fill: chartColors.positive, display: `+$${current.expansionMrr.toLocaleString()}` },
-      { name: 'Contraction', base: startMrr + current.newMrr + current.expansionMrr + current.contractionMrr, value: -current.contractionMrr, fill: chartColors.negative, display: `-$${current.contractionMrr.toLocaleString()}` },
-      { name: 'Churned', base: startMrr + current.newMrr + current.expansionMrr + current.contractionMrr + current.churnedMrr, value: -current.churnedMrr, fill: chartColors.negative, display: `-$${current.churnedMrr.toLocaleString()}` },
+      {
+        name: 'New MRR',
+        base: startMrr,
+        value: current.newMrr,
+        fill: chartColors.positive,
+        display: `+$${current.newMrr.toLocaleString()}`,
+      },
+      {
+        name: 'Expansion',
+        base: startMrr + current.newMrr,
+        value: current.expansionMrr,
+        fill: chartColors.positive,
+        display: `+$${current.expansionMrr.toLocaleString()}`,
+      },
+      {
+        name: 'Contraction',
+        base: startMrr + current.newMrr + current.expansionMrr + current.contractionMrr,
+        value: -current.contractionMrr,
+        fill: chartColors.negative,
+        display: `-$${current.contractionMrr.toLocaleString()}`,
+      },
+      {
+        name: 'Churned',
+        base: startMrr + current.newMrr + current.expansionMrr + current.contractionMrr + current.churnedMrr,
+        value: -current.churnedMrr,
+        fill: chartColors.negative,
+        display: `-$${current.churnedMrr.toLocaleString()}`,
+      },
       { name: 'End', base: 0, value: endMrr, fill: chartColors.accent, display: `$${endMrr.toLocaleString()}` },
     ];
     return segs;
@@ -71,12 +93,7 @@ export function MrrWaterfallChart({ snapshots }: { snapshots: Snapshot[] }) {
             <XAxis dataKey="name" tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} interval={0} />
             <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
             <Tooltip
-              content={
-                <ChartTooltip
-                  formatter={(v) => `$${Math.abs(Number(v)).toLocaleString()}`}
-                  labelFormatter={(l) => String(l)}
-                />
-              }
+              content={<ChartTooltip formatter={(v) => `$${Math.abs(Number(v)).toLocaleString()}`} labelFormatter={(l) => String(l)} />}
               cursor={{ fill: 'rgba(255,255,255,0.03)' }}
             />
             <ReferenceLine y={0} stroke={chartColors.axis} strokeOpacity={0.8} />
@@ -85,11 +102,7 @@ export function MrrWaterfallChart({ snapshots }: { snapshots: Snapshot[] }) {
               {data.map((d, i) => (
                 <Cell key={i} fill={d.fill} />
               ))}
-              <LabelList
-                dataKey="display"
-                position="top"
-                style={{ fill: chartColors.muted, fontSize: 10, fontWeight: 600 }}
-              />
+              <LabelList dataKey="display" position="top" style={{ fill: chartColors.muted, fontSize: 10, fontWeight: 600 }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

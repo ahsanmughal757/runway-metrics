@@ -31,7 +31,13 @@ export function Team() {
   const queryClient = useQueryClient();
   const canManage = can('members:updateRole');
 
-  const { data: members, isPending, isError, error, refetch } = useQuery({
+  const {
+    data: members,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: companyKeys.members(activeCompanyId),
     queryFn: ({ signal }) => api.get<Member[]>('/companies/members', signal),
     // No company, no request. See the rule in `queryKeys.ts`.
@@ -156,7 +162,8 @@ export function Team() {
                             selectedKeys={[m.role]}
                             onSelectionChange={(keys) => {
                               const next = Array.from(keys)[0];
-                              if (typeof next === 'string' && next !== m.role) changeRole.mutate({ companyId: activeCompanyId, member: m, next: next as Role });
+                              if (typeof next === 'string' && next !== m.role)
+                                changeRole.mutate({ companyId: activeCompanyId, member: m, next: next as Role });
                             }}
                             className="w-40"
                             classNames={{ trigger: 'bg-white/[0.02] border border-runway-border/70 rounded-lg h-8 min-h-8' }}
@@ -180,7 +187,12 @@ export function Team() {
                           same cell count as the header. */}
                       <TableCell>
                         {manageable && (
-                          <Button size="sm" variant="light" color="danger" onPress={() => removeMember.mutate({ companyId: activeCompanyId, member: m })}>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="danger"
+                            onPress={() => removeMember.mutate({ companyId: activeCompanyId, member: m })}
+                          >
                             Remove
                           </Button>
                         )}

@@ -2,12 +2,39 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+# Every `.env` variant, not just `.env`. The old rule matched `.env` exactly, so
+# `.env.local`, `.env.production` and `.env.development` were all unprotected and
+# only `backend/.env` was covered by accident of where it lived. The negation
+# re-admits the committed templates, which are supposed to be in git.
 .env
+.env.*
+!.env.example
 *.log
 .DS_Store
 
-# Agent tooling. Carries its own node_modules and local state, none of it
-# project content.
+# Test and coverage output
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+junit.xml
+*.lcov
+
+# Local override and scratch files
+*.local
+*.pid
+*.seed
+
+# Editor state
+.vscode/
+.idea/
+
+# Agent tooling and the state it leaves behind. Carries its own node_modules and
+# local state, none of it project content.
+.claude/
+.cursor/
 .opencode/
 
 # A generated dump of the source tree (imports and comments per file). It

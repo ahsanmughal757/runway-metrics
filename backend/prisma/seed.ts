@@ -14,10 +14,50 @@ import { slugify } from '../src/common/slug';
 
 const prisma = new PrismaClient();
 
-const DEMO_PASSWORD = 'demo-password-123';
+/**
+ * The demo password is read from the environment rather than living here as a
+ * constant, and the absence of one is a hard failure.
+ *
+ * It used to be the literal `demo-password-123` in this file. That is a known
+ * credential in a public repository, and combined with a missing deploy story
+ * (nothing ran `migrate deploy`, so seeding was the obvious manual step) it was
+ * a realistic route to three verified `@runway.local` accounts in production —
+ * accounts with `emailVerifiedAt` set, so they would pass anything downstream
+ * that trusted a verified email.
+ *
+ * Failing loudly beats refusing: an operator who genuinely wants the demo data
+ * sets `DEMO_PASSWORD` and gets it, and an operator who has not heard of the
+ * variable gets a refusal rather than a quiet, guessable account.
+ */
+function demoPassword(): string {
+  const password = process.env.DEMO_PASSWORD;
+  if (!password) {
+    throw new Error(
+      'DEMO_PASSWORD is not set. This seed creates three sign-in accounts with a shared password, so it will not pick one for you. ' +
+        'Set DEMO_PASSWORD to a value of your choosing and rerun. Generate one with: node ../scripts/generate-secrets.mjs',
+    );
+  }
+  if (password.length < 12) {
+    // These accounts are seeded for demonstration, and the password is shared
+    // across all three of them, so it is a single secret protecting three
+    // logins. A short one is not a meaningful boundary.
+    throw new Error(`DEMO_PASSWORD is ${password.length} characters; it must be at least 12.`);
+  }
+  return password;
+}
 
 async function main() {
-  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 12);
+  // Checked before the first write, not after: a seed that creates half the
+  // data and then refuses is worse than one that refuses immediately.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Refusing to seed demo data with NODE_ENV=production. This creates three accounts with a shared, known password. ' +
+        'If you are standing up a real tenant, create the owner through the register endpoint instead.',
+    );
+  }
+
+  const password = demoPassword();
+  const passwordHash = await bcrypt.hash(password, 12);
 
   const [founder, analyst, viewer] = await Promise.all([
     upsertUser('demo.owner@runway.local', passwordHash, 'Demo Owner'),
@@ -94,7 +134,10 @@ async function main() {
 
   console.log('Seeded 3 demo companies (24 months + 12 cohorts each).');
   console.log(`Sign in with any of: demo.owner@ / demo.analyst@ / demo.viewer@runway.local`);
-  console.log(`Password: ${DEMO_PASSWORD}`);
+  // The password is not echoed. It came from the operator's environment and
+  // they already have it, whereas a seed log ends up in a deploy transcript
+  // that is read by more people than the person who chose the secret.
+  console.log('Password: the value of DEMO_PASSWORD you set for this run.');
 }
 
 async function seedCustomers(companyId: string, personaKey: Parameters<typeof generateCohorts>[0]) {

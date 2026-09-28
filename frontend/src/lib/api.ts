@@ -231,12 +231,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, callerSignal?: A
   } catch (cause) {
     if (callerSignal?.aborted) throw cause;
     if (cause instanceof DOMException && cause.name === 'TimeoutError') {
-      throw new ApiError(
-        `Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s. The server may be down.`,
-        0,
-        'TIMEOUT',
-        null,
-      );
+      throw new ApiError(`Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)}s. The server may be down.`, 0, 'TIMEOUT', null);
     }
     // Offline, DNS failure, connection refused. `status: 0` marks "never reached
     // the server", which is a different message from any 4xx or 5xx.

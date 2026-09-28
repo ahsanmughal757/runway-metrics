@@ -31,7 +31,7 @@ Do not start a new phase without confirming phases before it are done.
 | **3c** | **Regressions in shipped phases** | **done** (`2630072`) | [archive/phase-3c-regressions.md](archive/phase-3c-regressions.md) |
 | 4 | Credential encryption (AES-256-GCM) + real API keys | **done** (`4327a34`) | [archive/phase-4-credential-encryption.md](archive/phase-4-credential-encryption.md) |
 | 5 | Frontend data layer | **done** | [archive/phase-5-frontend-data-layer.md](archive/phase-5-frontend-data-layer.md) |
-| 6 | CI, deploy, observability | not started | [phase-6-ci-deploy-observability.md](phase-6-ci-deploy-observability.md) |
+| 6 | CI, deploy, observability | in progress | [phase-6-ci-deploy-observability.md](phase-6-ci-deploy-observability.md) |
 | 7 | Frontend accessibility, navigation, bundle | not started | [phase-7-accessibility-navigation-bundle.md](phase-7-accessibility-navigation-bundle.md) |
 
 Phase 3c was a late insertion. Phases 1–3b shipped with defects that were only

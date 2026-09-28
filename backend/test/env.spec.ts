@@ -17,7 +17,7 @@ function loadEnvWith(overrides: Record<string, string | undefined>): LoadResult 
 
   try {
     jest.resetModules();
-     
+
     const mod = require('../src/config/env') as { env: Record<string, unknown> };
     return { ok: true, env: mod.env };
   } catch (err) {

@@ -15,8 +15,9 @@ class AcceptInviteDto {
 class RedeemInviteDto {
   @IsString() @MaxLength(200) token!: string;
   @Transform(Trim)
-
-  @IsEmail() @MaxLength(254) email!: string;
+  @IsEmail()
+  @MaxLength(254)
+  email!: string;
   // Required whether or not the account already exists: the redeem call is what
   // proves control of the address, and proving it with a guessable secret would
   // let anyone claim an invitation forwarded to them.

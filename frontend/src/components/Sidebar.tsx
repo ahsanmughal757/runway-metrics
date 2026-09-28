@@ -1,8 +1,23 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, GitCompare, Command, Rocket,
-  SlidersHorizontal, UserCog, Activity, Plug, CreditCard, KeyRound, MonitorSmartphone,
+  LayoutDashboard,
+  Users,
+  TrendingUp,
+  Upload,
+  FileText,
+  Settings,
+  UserPlus,
+  GitCompare,
+  Command,
+  Rocket,
+  SlidersHorizontal,
+  UserCog,
+  Activity,
+  Plug,
+  CreditCard,
+  KeyRound,
+  MonitorSmartphone,
 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useCompany } from '../lib/CompanyContext';
@@ -111,7 +126,9 @@ export function Sidebar() {
         >
           <Command size={13} className="transition-colors group-hover:text-runway-accent" />
           <span>Quick actions</span>
-          <kbd className="ml-auto text-[10px] border border-runway-border rounded-md px-1.5 py-0.5 bg-runway-charcoal text-runway-muted">⌘K</kbd>
+          <kbd className="ml-auto text-[10px] border border-runway-border rounded-md px-1.5 py-0.5 bg-runway-charcoal text-runway-muted">
+            ⌘K
+          </kbd>
         </button>
 
         <div className="flex items-center gap-2.5 rounded-xl border border-runway-border/70 bg-runway-surface/60 px-3 py-2.5">

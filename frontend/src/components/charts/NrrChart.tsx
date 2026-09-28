@@ -17,7 +17,15 @@ export function NrrChart({ snapshots }: { snapshots: Snapshot[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
+        />
         <YAxis
           tick={axisTickStyle}
           axisLine={false}
@@ -34,7 +42,10 @@ export function NrrChart({ snapshots }: { snapshots: Snapshot[] }) {
           strokeOpacity={0.9}
           label={{ value: '100% · break-even', position: 'insideBottomRight', fill: chartColors.muted, fontSize: 10 }}
         />
-        <Tooltip content={<ChartTooltip formatter={(v) => `${v.toFixed(1)}%`} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
+        <Tooltip
+          content={<ChartTooltip formatter={(v) => `${v.toFixed(1)}%`} />}
+          cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }}
+        />
         <Area
           type="monotone"
           dataKey="nrr"

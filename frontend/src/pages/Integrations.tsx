@@ -20,9 +20,7 @@ export function Integrations() {
     >
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">Integrations</h2>
-        <p className="text-sm text-runway-muted mt-0.5">
-          Connect your tools to keep Runway up to date automatically.
-        </p>
+        <p className="text-sm text-runway-muted mt-0.5">Connect your tools to keep Runway up to date automatically.</p>
       </motion.div>
 
       <motion.div

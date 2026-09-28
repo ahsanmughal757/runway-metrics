@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AuditAction, AuditEntityType, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
+import { incrementCounter } from '../common/observability/counters';
 import { env } from '../config/env';
 
 export type { AuditAction, AuditEntityType };
@@ -59,15 +60,45 @@ export function describeAudit(input: { entityType: AuditEntityType; action: Audi
 // events so the Notifications panel isn't empty on first load.
 const demoFeed: Record<string, ActivityItem[]> = {
   'demo-company-steady': [
-    { id: 'a1', entityType: 'METRIC_SNAPSHOT', action: 'UPDATED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString() },
-    { id: 'a2', entityType: 'INVITE', action: 'INVITED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString() },
-    { id: 'a3', entityType: 'REPORT', action: 'GENERATED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString() },
+    {
+      id: 'a1',
+      entityType: 'METRIC_SNAPSHOT',
+      action: 'UPDATED',
+      changedBy: 'Demo Owner',
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+    },
+    {
+      id: 'a2',
+      entityType: 'INVITE',
+      action: 'INVITED',
+      changedBy: 'Demo Owner',
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(),
+    },
+    {
+      id: 'a3',
+      entityType: 'REPORT',
+      action: 'GENERATED',
+      changedBy: 'Demo Owner',
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+    },
   ],
   'demo-company-hypergrowth': [
-    { id: 'a4', entityType: 'METRIC_SNAPSHOT', action: 'IMPORTED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString() },
+    {
+      id: 'a4',
+      entityType: 'METRIC_SNAPSHOT',
+      action: 'IMPORTED',
+      changedBy: 'Demo Owner',
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    },
   ],
   'demo-company-struggling': [
-    { id: 'a5', entityType: 'METRIC_SNAPSHOT', action: 'UPDATED', changedBy: 'Demo Owner', changedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString() },
+    {
+      id: 'a5',
+      entityType: 'METRIC_SNAPSHOT',
+      action: 'UPDATED',
+      changedBy: 'Demo Owner',
+      changedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    },
   ],
 };
 
@@ -129,10 +160,14 @@ export class AuditService {
         select: { id: true },
       });
     } catch (err) {
-      this.logger.error(
-        { err, ...input },
-        'Failed to write audit log entry',
-      );
+      // Counted as well as logged. The log line is what an operator reads after
+      // the fact; the counter is what tells them the trail stopped while
+      // nothing was obviously broken, which is the failure this method's own
+      // comment warns about — a trail that quietly stops recording looks exactly
+      // like a healthy one until someone goes looking for an entry that is not
+      // there.
+      incrementCounter('audit_write_failed', { entityType: input.entityType, action: input.action });
+      this.logger.error({ err, ...input }, 'Failed to write audit log entry');
     }
   }
 
@@ -150,7 +185,10 @@ export class AuditService {
   }
 
   /** Paginated + optionally entityType-filtered feed for the full Activity page. */
-  async list(companyId: string, opts: { page?: number; pageSize?: number; entityType?: string }): Promise<{ items: ActivityItem[]; total: number; page: number; pageSize: number }> {
+  async list(
+    companyId: string,
+    opts: { page?: number; pageSize?: number; entityType?: string },
+  ): Promise<{ items: ActivityItem[]; total: number; page: number; pageSize: number }> {
     const page = Math.max(1, opts.page ?? 1);
     const pageSize = Math.min(50, Math.max(1, opts.pageSize ?? 15));
     const entityType = asEntityType(opts.entityType);
@@ -196,7 +234,5 @@ function toActivityItem(r: AuditRow): ActivityItem {
 /** The filter arrives as a query string, so it is validated rather than trusted. */
 function asEntityType(value: string | undefined): AuditEntityType | undefined {
   if (!value) return undefined;
-  return (Object.values(AuditEntityType) as string[]).includes(value)
-    ? (value as AuditEntityType)
-    : undefined;
+  return (Object.values(AuditEntityType) as string[]).includes(value) ? (value as AuditEntityType) : undefined;
 }

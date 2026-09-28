@@ -21,12 +21,15 @@ export function Cohorts() {
   });
 
   return (
-    <motion.div className="flex flex-col gap-4" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+    <motion.div
+      className="flex flex-col gap-4"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <div>
         <h2 className="text-lg font-medium text-runway-text">Cohort Retention</h2>
-        <p className="text-sm text-runway-muted">
-          Built on seeded demo data (v1) — real customer-level ingestion is planned for v2.
-        </p>
+        <p className="text-sm text-runway-muted">Built on seeded demo data (v1) — real customer-level ingestion is planned for v2.</p>
       </div>
       {/* Conditional rather than an early return, because the page heading and the
           two "nothing to show" branches below are one screen: returning early
@@ -54,7 +57,11 @@ export function Cohorts() {
         </div>
       )}
       {data && data.length === 0 && (
-        <EmptyState icon={Users} title="No cohort data available yet" description="Cohort retention appears once customer-level data has been seeded for this company." />
+        <EmptyState
+          icon={Users}
+          title="No cohort data available yet"
+          description="Cohort retention appears once customer-level data has been seeded for this company."
+        />
       )}
     </motion.div>
   );

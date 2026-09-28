@@ -25,8 +25,12 @@ export interface InvestorUpdateData {
   periodLabel: string;
   narrativeSections: { heading: string; body: string }[];
   latest: {
-    mrr: number; momGrowthRate: number | null; runwayMonths: number | null;
-    nrr: number | null; revenueChurnPct: number | null; cash: number;
+    mrr: number;
+    momGrowthRate: number | null;
+    runwayMonths: number | null;
+    nrr: number | null;
+    revenueChurnPct: number | null;
+    cash: number;
   };
   snapshots: SnapshotInput[];
   generatedAt: string;
@@ -41,7 +45,9 @@ function InvestorUpdateDocument({ data }: { data: InvestorUpdateData }) {
     <Document>
       <Page size="A4" style={styles.page}>
         <Text style={styles.title}>{data.companyName} — Investor Update</Text>
-        <Text style={styles.subtitle}>{data.periodLabel} · Generated {data.generatedAt}</Text>
+        <Text style={styles.subtitle}>
+          {data.periodLabel} · Generated {data.generatedAt}
+        </Text>
 
         <View style={styles.kpiRow}>
           <View style={styles.kpiCard}>

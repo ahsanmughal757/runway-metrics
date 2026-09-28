@@ -28,10 +28,7 @@ export function NotFound() {
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <Link
-          to="/"
-          className="rounded-xl bg-accent-gradient px-4 py-2 text-sm font-medium text-white shadow-glow"
-        >
+        <Link to="/" className="rounded-xl bg-accent-gradient px-4 py-2 text-sm font-medium text-white shadow-glow">
           Back to dashboard
         </Link>
         <Link to="/settings" className="text-sm text-runway-muted underline underline-offset-2 hover:text-runway-text">

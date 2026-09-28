@@ -61,7 +61,9 @@ describe('CredentialCryptoService', () => {
     it('refuses a modified IV', () => {
       const crypto = service();
       const envelope = crypto.encrypt('secret', 'ctx');
-      expect(() => crypto.decrypt(swap(envelope, 2, Buffer.from('nope-nope!').toString('base64url')), 'ctx')).toThrow(DecryptionFailedError);
+      expect(() => crypto.decrypt(swap(envelope, 2, Buffer.from('nope-nope!').toString('base64url')), 'ctx')).toThrow(
+        DecryptionFailedError,
+      );
     });
 
     it('refuses a modified tag', () => {
@@ -87,7 +89,9 @@ describe('CredentialCryptoService', () => {
       const other = crypto.encrypt('attacker', 'ctx');
       const mine = crypto.encrypt('mine', 'ctx');
       const parts = other.split(':');
-      expect(() => crypto.decrypt(`${parts[0]}:${parts[1]}:${parts[2]}:${parts[3]}:${mine.split(':')[4]}`, 'ctx')).toThrow(DecryptionFailedError);
+      expect(() => crypto.decrypt(`${parts[0]}:${parts[1]}:${parts[2]}:${parts[3]}:${mine.split(':')[4]}`, 'ctx')).toThrow(
+        DecryptionFailedError,
+      );
     });
   });
 

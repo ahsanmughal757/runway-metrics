@@ -49,6 +49,21 @@ async function main(): Promise<void> {
     }
 
     say(`Re-encrypted ${pending.length} share-link token(s) under key ${crypto.activeKey}.`);
+
+    // Re-count rather than assuming. Phase 6 makes this a deploy step, and a
+    // deploy step that reports success without checking has not verified
+    // anything: the failure it exists to prevent is a share link that resolves
+    // to nothing, and that is invisible until an investor clicks the URL.
+    const stillPending = await prisma.shareLink.count({
+      where: { tokenCiphertext: { startsWith: PENDING_PREFIX } },
+    });
+
+    if (stillPending > 0) {
+      throw new Error(
+        `${stillPending} share-link token(s) are still pending after re-encryption. ` +
+          'Every one of them is a dead link for whoever holds it. Do not treat this deploy as healthy.',
+      );
+    }
   } finally {
     await prisma.$disconnect();
   }

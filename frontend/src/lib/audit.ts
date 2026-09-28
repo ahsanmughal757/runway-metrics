@@ -9,15 +9,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { FileText, Settings, TrendingUp, Upload, UserPlus, Users, Link as LinkIcon } from 'lucide-react';
 
-export const AUDIT_ENTITY_TYPES = [
-  'COMPANY_SETTINGS',
-  'MEMBER',
-  'CUSTOMER',
-  'METRIC_SNAPSHOT',
-  'INVITE',
-  'REPORT',
-  'SHARE_LINK',
-] as const;
+export const AUDIT_ENTITY_TYPES = ['COMPANY_SETTINGS', 'MEMBER', 'CUSTOMER', 'METRIC_SNAPSHOT', 'INVITE', 'REPORT', 'SHARE_LINK'] as const;
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 
 export const AUDIT_ACTIONS = [

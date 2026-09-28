@@ -5,8 +5,17 @@ import {
   Button,
   Checkbox,
   Input,
-  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  Table, TableHeader, TableColumn, TableBody, TableRow, TableCell,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
 } from '@heroui/react';
 import { KeyRound, Lock, Plus, Trash2 } from 'lucide-react';
 import { useToast } from '../lib/ToastContext';
@@ -71,7 +80,13 @@ export function ApiKeys() {
   /** The one and only time the secret exists in the browser. */
   const [fresh, setFresh] = useState<CreatedKey | null>(null);
 
-  const { data: keys, isPending, isError, error, refetch } = useQuery({
+  const {
+    data: keys,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: companyKeys.apiKeys(activeCompanyId),
     queryFn: ({ signal }) => api.get<ApiKeySummary[]>('/companies/api-keys', signal),
     // The list is `apiKeys:manage` on the server, so a role without it could
@@ -93,9 +108,7 @@ export function ApiKeys() {
       // state above, because a cache entry outlives the component that wrote it
       // and is the one place a live credential could be read back out of by
       // something other than the modal deliberately showing it once.
-      queryClient.setQueryData<ApiKeySummary[]>(companyKeys.apiKeys(companyId), (prev) =>
-        prev ? [created.key, ...prev] : [created.key],
-      );
+      queryClient.setQueryData<ApiKeySummary[]>(companyKeys.apiKeys(companyId), (prev) => (prev ? [created.key, ...prev] : [created.key]));
       setCreating(false);
       setName('');
       setScopes([]);
@@ -173,8 +186,8 @@ export function ApiKeys() {
       <motion.div variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">API Keys</h2>
         <p className="text-sm text-runway-muted mt-0.5">
-          Machine credentials for the Runway API. Send one as the <code className="text-xs">X-Api-Key</code> header. The secret is shown once
-          and is never retrievable afterwards.
+          Machine credentials for the Runway API. Send one as the <code className="text-xs">X-Api-Key</code> header. The secret is shown
+          once and is never retrievable afterwards.
         </p>
       </motion.div>
 
@@ -187,13 +200,19 @@ export function ApiKeys() {
               <span className="text-sm font-semibold text-runway-text">Keys</span>
             </div>
             {canManage && (
-              <Button size="sm" color="primary" startContent={<Plus size={14} />} onPress={() => setCreating(true)} className="bg-accent-gradient font-medium">
+              <Button
+                size="sm"
+                color="primary"
+                startContent={<Plus size={14} />}
+                onPress={() => setCreating(true)}
+                className="bg-accent-gradient font-medium"
+              >
                 Create new key
               </Button>
             )}
           </div>
           <div className="relative px-4 pb-4">
-          <Table
+            <Table
               aria-label="API keys"
               removeWrapper
               classNames={{
@@ -235,7 +254,9 @@ export function ApiKeys() {
                       </div>
                     </TableCell>
                     <TableCell className="text-runway-muted text-xs whitespace-nowrap">{date(k.createdAt)}</TableCell>
-                    <TableCell className="text-runway-muted text-xs whitespace-nowrap">{k.lastUsedAt ? date(k.lastUsedAt) : 'Never'}</TableCell>
+                    <TableCell className="text-runway-muted text-xs whitespace-nowrap">
+                      {k.lastUsedAt ? date(k.lastUsedAt) : 'Never'}
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
                         {/* No "regenerate": a secret cannot be re-read, so
@@ -243,7 +264,13 @@ export function ApiKeys() {
                             silently leaving the old key live. Revoke, then
                             create, and make the operator do both. */}
                         {!k.isRevoked && canManage && (
-                          <Button size="sm" variant="light" color="danger" startContent={<Trash2 size={13} />} onPress={() => setRevoking(k)}>
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="danger"
+                            startContent={<Trash2 size={13} />}
+                            onPress={() => setRevoking(k)}
+                          >
                             Revoke
                           </Button>
                         )}
@@ -257,11 +284,23 @@ export function ApiKeys() {
         </div>
       </motion.div>
 
-      <Modal isOpen={creating} onClose={() => setCreating(false)} className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text" size="lg">
+      <Modal
+        isOpen={creating}
+        onClose={() => setCreating(false)}
+        className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text"
+        size="lg"
+      >
         <ModalContent>
           <ModalHeader className="text-sm font-semibold">Create an API key</ModalHeader>
           <ModalBody className="text-sm text-runway-muted flex flex-col gap-4">
-            <Input label="Name" labelPlacement="outside" placeholder="Nightly export to S3" value={name} onValueChange={setName} maxLength={80} />
+            <Input
+              label="Name"
+              labelPlacement="outside"
+              placeholder="Nightly export to S3"
+              value={name}
+              onValueChange={setName}
+              maxLength={80}
+            />
             <div className="flex flex-col gap-2">
               <span className="text-xs text-runway-text font-medium">Scopes</span>
               {/* A key holds only what it needs. Defaulting to everything would
@@ -280,8 +319,8 @@ export function ApiKeys() {
                 ))}
               </div>
               <p className="text-[11px] text-runway-muted">
-                A key cannot be given “Manage API keys”. It would be able to mint a replacement for itself with every scope, which turns revoking
-                one into a race.
+                A key cannot be given “Manage API keys”. It would be able to mint a replacement for itself with every scope, which turns
+                revoking one into a race.
               </p>
             </div>
           </ModalBody>
@@ -289,20 +328,32 @@ export function ApiKeys() {
             <Button size="sm" variant="light" onPress={() => setCreating(false)}>
               Cancel
             </Button>
-            <Button size="sm" color="primary" className="bg-accent-gradient" isDisabled={name.trim() === '' || scopes.length === 0} isLoading={createKey.isPending} onPress={submitCreate}>
+            <Button
+              size="sm"
+              color="primary"
+              className="bg-accent-gradient"
+              isDisabled={name.trim() === '' || scopes.length === 0}
+              isLoading={createKey.isPending}
+              onPress={submitCreate}
+            >
               Create key
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={fresh !== null} onClose={() => setFresh(null)} className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text" size="lg">
+      <Modal
+        isOpen={fresh !== null}
+        onClose={() => setFresh(null)}
+        className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text"
+        size="lg"
+      >
         <ModalContent>
           <ModalHeader className="text-sm font-semibold">Copy this key now</ModalHeader>
           <ModalBody className="text-sm text-runway-muted flex flex-col gap-3">
             <p>
-              The secret for <span className="text-runway-text font-medium">{fresh?.key.name}</span> is shown here and nowhere else. It is stored
-              as a hash, so it cannot be displayed again — if you lose it, revoke this key and create another.
+              The secret for <span className="text-runway-text font-medium">{fresh?.key.name}</span> is shown here and nowhere else. It is
+              stored as a hash, so it cannot be displayed again — if you lose it, revoke this key and create another.
             </p>
             <code className="text-xs text-runway-text bg-white/[0.03] border border-runway-border/60 rounded-md px-3 py-2 break-all">
               {fresh?.secret}
@@ -324,12 +375,17 @@ export function ApiKeys() {
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={revoking !== null} onClose={() => setRevoking(null)} className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text" size="sm">
+      <Modal
+        isOpen={revoking !== null}
+        onClose={() => setRevoking(null)}
+        className="bg-runway-raised border border-runway-borderStrong rounded-2xl text-runway-text"
+        size="sm"
+      >
         <ModalContent>
           <ModalHeader className="text-sm font-semibold">Revoke this key?</ModalHeader>
           <ModalBody className="text-sm text-runway-muted">
-            Anything using <span className="text-runway-text font-medium">{revoking?.name}</span> will start getting 401s. This cannot be undone, and
-            the secret cannot be recovered — you would have to create a new key.
+            Anything using <span className="text-runway-text font-medium">{revoking?.name}</span> will start getting 401s. This cannot be
+            undone, and the secret cannot be recovered — you would have to create a new key.
           </ModalBody>
           <ModalFooter>
             <Button size="sm" variant="light" onPress={() => setRevoking(null)}>

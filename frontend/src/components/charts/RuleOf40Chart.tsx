@@ -13,7 +13,15 @@ export function RuleOf40Chart({ snapshots }: { snapshots: Snapshot[] }) {
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
+        />
         <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} width={42} />
         <Tooltip content={<ChartTooltip formatter={(v) => `${v}%`} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
         <ReferenceLine

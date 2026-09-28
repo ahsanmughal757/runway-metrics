@@ -2,8 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  LayoutDashboard, Users, TrendingUp, Upload, FileText, Settings, UserPlus, Search, SlidersHorizontal,
-  UserCog, Activity, Plug, CreditCard, KeyRound,
+  LayoutDashboard,
+  Users,
+  TrendingUp,
+  Upload,
+  FileText,
+  Settings,
+  UserPlus,
+  Search,
+  SlidersHorizontal,
+  UserCog,
+  Activity,
+  Plug,
+  CreditCard,
+  KeyRound,
 } from 'lucide-react';
 
 interface Command {
@@ -48,10 +60,7 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', onKeydown);
   }, []);
 
-  const filtered = useMemo(
-    () => commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase())),
-    [query],
-  );
+  const filtered = useMemo(() => commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase())), [query]);
 
   function run(cmd: Command) {
     cmd.action(navigate);
@@ -89,12 +98,12 @@ export function CommandPalette() {
                 placeholder="Jump to a screen or action…"
                 className="bg-transparent outline-none text-sm text-runway-text flex-1 placeholder:text-runway-muted"
               />
-              <kbd className="text-[10px] text-runway-muted border border-runway-border rounded-md px-1.5 py-0.5 bg-runway-charcoal">ESC</kbd>
+              <kbd className="text-[10px] text-runway-muted border border-runway-border rounded-md px-1.5 py-0.5 bg-runway-charcoal">
+                ESC
+              </kbd>
             </div>
             <div className="max-h-80 overflow-y-auto py-1.5">
-              {filtered.length === 0 && (
-                <p className="px-4 py-6 text-sm text-runway-muted text-center">No matching commands.</p>
-              )}
+              {filtered.length === 0 && <p className="px-4 py-6 text-sm text-runway-muted text-center">No matching commands.</p>}
               {filtered.map((c) => (
                 <button
                   key={c.id}

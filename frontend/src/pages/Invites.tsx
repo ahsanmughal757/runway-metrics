@@ -48,7 +48,13 @@ export function Invites() {
   const [grantRole, setGrantRole] = useState<Role>('VIEWER');
   const canInvite = can('members:invite');
 
-  const { data: invites, isPending, isError, error, refetch } = useQuery({
+  const {
+    data: invites,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: companyKeys.invites(activeCompanyId),
     queryFn: ({ signal }) => api.get<Invite[]>('/companies/invites', signal),
     // No company, no request. See the rule in `queryKeys.ts`.
@@ -82,7 +88,9 @@ export function Invites() {
       // The endpoint answers `{ revoked: true }` rather than the updated invite,
       // so the status is flipped here instead. It is the only field that moves,
       // and a background refetch reconciles anything the server did besides.
-      queryClient.setQueryData<Invite[]>(companyKeys.invites(companyId), (prev) => prev?.map((i) => (i.id === id ? { ...i, status: 'REVOKED' as const } : i)));
+      queryClient.setQueryData<Invite[]>(companyKeys.invites(companyId), (prev) =>
+        prev?.map((i) => (i.id === id ? { ...i, status: 'REVOKED' as const } : i)),
+      );
       push('Invitation revoked.', 'success');
     },
     onError: (e: unknown) => {
@@ -118,8 +126,8 @@ export function Invites() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">Team invites</h2>
         <p className="text-sm text-runway-muted">
-          Give a teammate access to this workspace. A Viewer is the right choice for an investor: they can read the
-          dashboard, cohorts and reports, and change nothing.
+          Give a teammate access to this workspace. A Viewer is the right choice for an investor: they can read the dashboard, cohorts and
+          reports, and change nothing.
         </p>
       </div>
 
@@ -138,8 +146,7 @@ export function Invites() {
                 isRequired
                 className="flex-1"
                 classNames={{
-                  inputWrapper:
-                    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
+                  inputWrapper: 'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
                   label: 'text-runway-muted',
                 }}
               />
@@ -193,8 +200,7 @@ export function Invites() {
                     <div className="min-w-0">
                       <p className="text-sm text-runway-text font-medium truncate">{inv.email}</p>
                       <p className="text-[11px] text-runway-muted">
-                        {ROLE_LABELS[inv.role]} &middot; invited by {inv.invitedBy} on{' '}
-                        {new Date(inv.createdAt).toLocaleDateString()}
+                        {ROLE_LABELS[inv.role]} &middot; invited by {inv.invitedBy} on {new Date(inv.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -202,7 +208,12 @@ export function Invites() {
                         {inv.isExpired && inv.status === 'PENDING' ? 'EXPIRED' : inv.status}
                       </Chip>
                       {canInvite && pending && (
-                        <Button size="sm" variant="light" color="danger" onPress={() => revoke.mutate({ companyId: activeCompanyId, id: inv.id })}>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          color="danger"
+                          onPress={() => revoke.mutate({ companyId: activeCompanyId, id: inv.id })}
+                        >
                           Revoke
                         </Button>
                       )}

@@ -80,13 +80,14 @@ export function NotificationsBell() {
                   it does not masquerade as an empty one.
                 */}
                 {isError && <p className="text-xs text-runway-negative/90 text-center py-8">Could not load activity.</p>}
-                {!isError && items.length === 0 && (
-                  <p className="text-xs text-runway-muted text-center py-8">Nothing yet.</p>
-                )}
+                {!isError && items.length === 0 && <p className="text-xs text-runway-muted text-center py-8">Nothing yet.</p>}
                 {items.map((item) => {
                   const Icon = ENTITY_ICONS[item.entityType] ?? Bell;
                   return (
-                    <div key={item.id} className="flex items-start gap-3 px-4 py-3 border-b border-runway-border/40 last:border-0 hover:bg-white/[0.02] transition-colors">
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-3 px-4 py-3 border-b border-runway-border/40 last:border-0 hover:bg-white/[0.02] transition-colors"
+                    >
                       <span className="w-7 h-7 rounded-lg bg-runway-accent/10 border border-runway-accent/20 flex items-center justify-center shrink-0 mt-0.5">
                         <Icon size={13} className="text-runway-accent" />
                       </span>

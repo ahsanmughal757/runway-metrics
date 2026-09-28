@@ -67,7 +67,8 @@ export function RunwayScenarioSlider({ snapshot, greenMonths = 12 }: { snapshot:
           <div className="flex items-center justify-between">
             <span className="text-xs text-runway-muted">Growth adjustment (MRR)</span>
             <span className="text-xs font-semibold text-runway-text tabular-nums">
-              {growthAdj >= 0 ? '+' : ''}{(growthAdj * 100).toFixed(0)}%
+              {growthAdj >= 0 ? '+' : ''}
+              {(growthAdj * 100).toFixed(0)}%
             </span>
           </div>
           <Slider
@@ -90,7 +91,8 @@ export function RunwayScenarioSlider({ snapshot, greenMonths = 12 }: { snapshot:
           <div className="flex items-center justify-between">
             <span className="text-xs text-runway-muted">Burn adjustment</span>
             <span className="text-xs font-semibold text-runway-text tabular-nums">
-              {burnAdj >= 0 ? '+' : ''}{(burnAdj * 100).toFixed(0)}%
+              {burnAdj >= 0 ? '+' : ''}
+              {(burnAdj * 100).toFixed(0)}%
             </span>
           </div>
           <Slider
@@ -146,10 +148,29 @@ export function RunwayScenarioSlider({ snapshot, greenMonths = 12 }: { snapshot:
               label={{ value: 'months out', position: 'insideBottomRight', fill: chartColors.muted, fontSize: 10 }}
             />
             <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
-            <Tooltip content={<ChartTooltip formatter={(v) => `$${Number(v).toLocaleString()}`} labelFormatter={(l) => `Month ${l}`} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
+            <Tooltip
+              content={<ChartTooltip formatter={(v) => `$${Number(v).toLocaleString()}`} labelFormatter={(l) => `Month ${l}`} />}
+              cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }}
+            />
             <ReferenceLine y={0} stroke={chartColors.negative} strokeOpacity={0.5} />
-            <Line type="monotone" dataKey="baseline" name="Current" stroke={chartColors.muted} strokeWidth={2} strokeDasharray="5 4" dot={false} />
-            <Line type="monotone" dataKey="scenario" name="Scenario" stroke={chartColors.accent} strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.accent, strokeWidth: 2.5 }} />
+            <Line
+              type="monotone"
+              dataKey="baseline"
+              name="Current"
+              stroke={chartColors.muted}
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="scenario"
+              name="Scenario"
+              stroke={chartColors.accent}
+              strokeWidth={2.5}
+              dot={false}
+              activeDot={{ r: 4, fill: '#ffffff', stroke: chartColors.accent, strokeWidth: 2.5 }}
+            />
           </LineChart>
         </ResponsiveContainer>
         <p className="px-2 pt-1 text-[11px] text-runway-muted">

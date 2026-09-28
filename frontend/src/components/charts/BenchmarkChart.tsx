@@ -38,9 +38,7 @@ function BandRow({ m }: { m: BenchmarkMetric }) {
           title={`You: ${m.percentile}th percentile`}
         />
       </div>
-      <span className="w-20 shrink-0 text-right tabular-nums text-runway-muted">
-        {m.you !== null ? fmtValue(m.you) : '—'}
-      </span>
+      <span className="w-20 shrink-0 text-right tabular-nums text-runway-muted">{m.you !== null ? fmtValue(m.you) : '—'}</span>
       <Chip
         size="sm"
         variant="flat"

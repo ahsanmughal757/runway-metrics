@@ -1,4 +1,16 @@
-dist
-node_modules
-coverage
-*.tsbuildinfo
+# Prettier's own output is not source. `frontend/dist` and `backend/dist` are
+# build artefacts checked by `format:check` before this file existed, which is
+# how a run that said "96 files have style issues" turned out to include minified
+# bundles whose contents depend on the build rather than on anything anyone typed.
+dist/
+build/
+coverage/
+node_modules/
+
+# Generated: a dump of the source tree. Reformatting it would produce a diff
+# against a file that is already documented as going stale on the next edit.
+project_context.json
+
+# Lockfiles are machine-written with a fixed shape. Reformatting one makes a
+# 580 kB diff that no human can review, for a file that is regenerated.
+pnpm-lock.yaml

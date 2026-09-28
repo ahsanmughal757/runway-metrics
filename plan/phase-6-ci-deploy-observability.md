@@ -1,6 +1,6 @@
 # Phase 6 — CI, deploy, observability
 
-**Status:** not started
+**Status:** in progress
 **Depends on:** Phases 3c, 4, 5
 
 **Note:** this phase left **no breadcrumb in the code**, unlike phases 1–5. Its

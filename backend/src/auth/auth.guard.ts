@@ -54,10 +54,7 @@ export class AuthGuard extends PassportAuthGuard('jwt') {
    * the members list and inherit whatever role it was later changed to. See the
    * scope-change notes in plan/phase-4-credential-encryption.md.
    */
-  private async authenticateWithKey(
-    req: { user?: unknown },
-    secret: string,
-  ): Promise<boolean> {
+  private async authenticateWithKey(req: { user?: unknown }, secret: string): Promise<boolean> {
     const resolved = await this.keys.authenticate(secret);
     if (!resolved) {
       // One message for unknown, revoked and expired, so the response cannot

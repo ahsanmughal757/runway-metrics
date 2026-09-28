@@ -14,10 +14,7 @@ export class PermissionsGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const required = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const required = this.reflector.getAllAndOverride<Permission[]>(PERMISSIONS_KEY, [context.getHandler(), context.getClass()]);
     if (!required || required.length === 0) return true;
 
     // getRequest() is untyped, so the request is narrowed to the one field
@@ -40,9 +37,7 @@ export class PermissionsGuard implements CanActivate {
       // Name the missing permission, not the role. The message is for whoever
       // is integrating, and it tells them what to fix rather than what the
       // caller's job title happens to be.
-      throw new ForbiddenException(
-        `This action requires one of the following permissions: ${required.join(', ')}`,
-      );
+      throw new ForbiddenException(`This action requires one of the following permissions: ${required.join(', ')}`);
     }
     return true;
   }

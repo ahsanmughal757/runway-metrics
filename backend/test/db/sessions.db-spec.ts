@@ -15,7 +15,8 @@
  *  - logout revokes server-side, not just in the browser
  *  - one user's session list cannot see or revoke another's
  */
-import type { INestApplication } from '@nestjs/common';import { createHash } from 'node:crypto';
+import type { INestApplication } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import request from 'supertest';
 import { closeApp, freshDb, makeApp, PASSWORD, prisma, registerOwner, uniqueEmail } from './harness';
 
@@ -66,10 +67,7 @@ const ageSession = (days = 30) => ({
 
 /** Signs an existing account in. Does not register, so it can be called twice. */
 async function login(app: INestApplication, email: string) {
-  const res = await request(app.getHttpServer())
-    .post('/api/auth/login')
-    .send({ email, password: PASSWORD })
-    .expect(200);
+  const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password: PASSWORD }).expect(200);
   return {
     userId: res.body.user.id as string,
     accessToken: res.body.accessToken as string,
@@ -119,10 +117,7 @@ describe('sessions and refresh rotation (real database)', () => {
       const email = uniqueEmail('user');
       await registerOwner(app, email, 'Acme');
 
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/login')
-        .send({ email, password: PASSWORD })
-        .expect(200);
+      const res = await request(app.getHttpServer()).post('/api/auth/login').send({ email, password: PASSWORD }).expect(200);
 
       const line = cookieLine(res);
       // The whole point of the cookie: script cannot read it.
@@ -169,10 +164,7 @@ describe('sessions and refresh rotation (real database)', () => {
       // Registration is itself a sign-in, so the account has three sessions and
       // three families. What matters is that no two logins share one, or reuse
       // detection on one device would sign the other out.
-      const rows = await Promise.all([
-        sessionFor(first.refreshToken),
-        sessionFor(second.refreshToken),
-      ]);
+      const rows = await Promise.all([sessionFor(first.refreshToken), sessionFor(second.refreshToken)]);
       expect(rows[0].familyId).not.toBe(rows[1].familyId);
       expect(first.refreshToken).not.toBe(second.refreshToken);
       expect(await liveFamily(first.refreshToken)).toHaveLength(1);
@@ -183,26 +175,17 @@ describe('sessions and refresh rotation (real database)', () => {
     it('returns a usable access token', async () => {
       const { refreshToken } = await signIn(app);
 
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(200);
+      const res = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(200);
 
       expect(res.body.accessToken).toEqual(expect.any(String));
       // And it authenticates for real.
-      await request(app.getHttpServer())
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${res.body.accessToken}`)
-        .expect(200);
+      await request(app.getHttpServer()).get('/api/auth/me').set('Authorization', `Bearer ${res.body.accessToken}`).expect(200);
     });
 
     it('rotates the cookie, so one token buys one access token', async () => {
       const { refreshToken } = await signIn(app);
 
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(200);
+      const res = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(200);
 
       const next = tokenFrom(res);
       expect(next).not.toBe(refreshToken);
@@ -212,10 +195,7 @@ describe('sessions and refresh rotation (real database)', () => {
       const { refreshToken } = await signIn(app);
       const before = await sessionFor(refreshToken);
 
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(200);
+      const res = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(200);
       const nextHash = sha256(tokenFrom(res));
 
       const after = await prisma.session.findUniqueOrThrow({ where: { id: before.id } });
@@ -233,10 +213,7 @@ describe('sessions and refresh rotation (real database)', () => {
       const { refreshToken } = await signIn(app);
       const before = await sessionFor(refreshToken);
 
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(200);
+      const res = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(200);
 
       // Sliding the expiry on every rotation would make the session immortal,
       // which is not what a 30-day expiry means to anyone reading it.
@@ -248,10 +225,7 @@ describe('sessions and refresh rotation (real database)', () => {
       let token = (await signIn(app)).refreshToken;
 
       for (let i = 0; i < 5; i += 1) {
-        const res = await request(app.getHttpServer())
-          .post('/api/auth/refresh')
-          .set(withCookie(token))
-          .expect(200);
+        const res = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(token)).expect(200);
         token = tokenFrom(res);
       }
 
@@ -264,10 +238,7 @@ describe('sessions and refresh rotation (real database)', () => {
     });
 
     it('rejects a token that was never issued', async () => {
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie('made-up-token'))
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie('made-up-token')).expect(401);
     });
 
     it('rejects an expired session', async () => {
@@ -275,20 +246,14 @@ describe('sessions and refresh rotation (real database)', () => {
       const row = await sessionFor(refreshToken);
       await prisma.session.update({ where: { id: row.id }, data: ageSession() });
 
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(401);
     });
 
     it('will not refresh a deactivated account', async () => {
       const { userId, refreshToken } = await signIn(app);
       await prisma.user.update({ where: { id: userId }, data: { isActive: false } });
 
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(401);
       // Every session dies, not just the family that presented the token -
       // "deactivated" has to mean the whole account.
       expect(await prisma.session.count({ where: { userId, revokedAt: null } })).toBe(0);
@@ -300,10 +265,7 @@ describe('sessions and refresh rotation (real database)', () => {
       const { refreshToken } = await signIn(app);
       await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(200);
 
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(401);
     });
 
     it('kills the whole family when an old token comes back', async () => {
@@ -312,17 +274,11 @@ describe('sessions and refresh rotation (real database)', () => {
       // captured token costs the legitimate user their session, visibly, and the
       // session is gone rather than still being usable from two places.
       const { refreshToken } = await signIn(app);
-      const first = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(200);
+      const first = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(200);
       const live = tokenFrom(first);
 
       // The attacker replays the captured token.
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(401);
 
       // The token the real client is holding is collateral damage, on purpose.
       await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(live)).expect(401);
@@ -333,22 +289,15 @@ describe('sessions and refresh rotation (real database)', () => {
       // Two devices, two families. A compromise on one must not sign the user
       // out of the other - that would turn an attack into a denial of service
       // on the victim's own account.
-      const { all: [laptop, phone] } = await signedInEverywhere(app, 2);
+      const {
+        all: [laptop, phone],
+      } = await signedInEverywhere(app, 2);
 
-      const rotated = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(laptop.refreshToken))
-        .expect(200);
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(laptop.refreshToken))
-        .expect(401);
+      const rotated = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(laptop.refreshToken)).expect(200);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(laptop.refreshToken)).expect(401);
 
       // The phone's session is untouched and still works.
-      const stillGood = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(phone.refreshToken))
-        .expect(200);
+      const stillGood = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(phone.refreshToken)).expect(200);
       expect(stillGood.body.accessToken).toEqual(expect.any(String));
       expect(tokenFrom(rotated)).toBeTruthy();
     });
@@ -358,10 +307,7 @@ describe('sessions and refresh rotation (real database)', () => {
     it('revokes the session server-side, not just in the browser', async () => {
       const { refreshToken } = await signIn(app);
 
-      const res = await request(app.getHttpServer())
-        .post('/api/auth/logout')
-        .set(withCookie(refreshToken))
-        .expect(204);
+      const res = await request(app.getHttpServer()).post('/api/auth/logout').set(withCookie(refreshToken)).expect(204);
 
       // The cookie is cleared with matching attributes, or the browser keeps it.
       expect(cookieLine(res)).toMatch(/HttpOnly/i);
@@ -381,17 +327,13 @@ describe('sessions and refresh rotation (real database)', () => {
     });
 
     it('leaves other devices signed in', async () => {
-      const { all: [laptop, phone] } = await signedInEverywhere(app, 2);
+      const {
+        all: [laptop, phone],
+      } = await signedInEverywhere(app, 2);
 
-      await request(app.getHttpServer())
-        .post('/api/auth/logout')
-        .set(withCookie(laptop.refreshToken))
-        .expect(204);
+      await request(app.getHttpServer()).post('/api/auth/logout').set(withCookie(laptop.refreshToken)).expect(204);
 
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(phone.refreshToken))
-        .expect(200);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(phone.refreshToken)).expect(200);
     });
 
     it('invalidates the access token that outlived the cookie', async () => {
@@ -401,14 +343,8 @@ describe('sessions and refresh rotation (real database)', () => {
       const { accessToken, refreshToken } = await signIn(app);
       await request(app.getHttpServer()).post('/api/auth/logout').set(withCookie(refreshToken)).expect(204);
 
-      await request(app.getHttpServer())
-        .get('/api/auth/me')
-        .set('Authorization', `Bearer ${accessToken}`)
-        .expect(200);
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(refreshToken))
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/auth/me').set('Authorization', `Bearer ${accessToken}`).expect(200);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(refreshToken)).expect(401);
     });
   });
 
@@ -457,10 +393,7 @@ describe('sessions and refresh rotation (real database)', () => {
       // Signed in later, so createdAt would put it second, and it has never
       // refreshed, so lastUsedAt is still null.
       const idle = await login(app, active.email);
-      const rotated = await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(active.refreshToken))
-        .expect(200);
+      const rotated = await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(active.refreshToken)).expect(200);
 
       const res = await request(app.getHttpServer())
         .get('/api/auth/sessions')
@@ -520,10 +453,7 @@ describe('sessions and refresh rotation (real database)', () => {
     it('lists only live sessions, newest activity first', async () => {
       const laptop = await signIn(app);
       const phone = await login(app, laptop.email);
-      await request(app.getHttpServer())
-        .post('/api/auth/logout')
-        .set(withCookie(laptop.refreshToken))
-        .expect(204);
+      await request(app.getHttpServer()).post('/api/auth/logout').set(withCookie(laptop.refreshToken)).expect(204);
 
       const res = await request(app.getHttpServer())
         .get('/api/auth/sessions')
@@ -539,14 +469,11 @@ describe('sessions and refresh rotation (real database)', () => {
       expect(res.body[0]).toMatchObject({ expiresAt: expect.any(String) });
     });
 
-    it('never shows one user another user\'s sessions', async () => {
+    it("never shows one user another user's sessions", async () => {
       const a = await signIn(app);
       const b = await signIn(app);
 
-      const res = await request(app.getHttpServer())
-        .get('/api/auth/sessions')
-        .set('Authorization', `Bearer ${b.accessToken}`)
-        .expect(200);
+      const res = await request(app.getHttpServer()).get('/api/auth/sessions').set('Authorization', `Bearer ${b.accessToken}`).expect(200);
 
       const ids = res.body.map((s: { id: string }) => s.id);
       const aRows = await prisma.session.findMany({ where: { userId: a.userId }, select: { id: true } });
@@ -554,7 +481,9 @@ describe('sessions and refresh rotation (real database)', () => {
     });
 
     it('revokes one session by id', async () => {
-      const { all: [laptop, phone] } = await signedInEverywhere(app, 2);
+      const {
+        all: [laptop, phone],
+      } = await signedInEverywhere(app, 2);
 
       // Selected by the phone's own token, so the test cannot pass or fail
       // because of the order rows happen to come back in.
@@ -575,17 +504,11 @@ describe('sessions and refresh rotation (real database)', () => {
         .set('Authorization', `Bearer ${laptop.accessToken}`)
         .expect(204);
 
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(phone.refreshToken))
-        .expect(401);
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(laptop.refreshToken))
-        .expect(200);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(phone.refreshToken)).expect(401);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(laptop.refreshToken)).expect(200);
     });
 
-    it('will not let one user revoke another user\'s session', async () => {
+    it("will not let one user revoke another user's session", async () => {
       const a = await signIn(app);
       const b = await signIn(app);
       const aRow = await sessionFor(a.refreshToken);
@@ -597,10 +520,7 @@ describe('sessions and refresh rotation (real database)', () => {
 
       // A's session survives the attempt.
       expect((await prisma.session.findUniqueOrThrow({ where: { id: aRow.id } })).revokedAt).toBeNull();
-      await request(app.getHttpServer())
-        .post('/api/auth/refresh')
-        .set(withCookie(a.refreshToken))
-        .expect(200);
+      await request(app.getHttpServer()).post('/api/auth/refresh').set(withCookie(a.refreshToken)).expect(200);
     });
 
     it('requires authentication', async () => {

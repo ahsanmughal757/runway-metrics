@@ -19,7 +19,15 @@ export function MomGrowthChart({ snapshots }: { snapshots: Snapshot[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
+        />
         <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} width={42} />
         <Tooltip content={<ChartTooltip formatter={(v) => `${v}%`} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
         <ReferenceLine y={0} stroke={chartColors.axis} strokeOpacity={0.8} />

@@ -55,13 +55,7 @@ export function ShareView() {
                 : 'Something went wrong.'}
           </p>
           {offline && (
-            <Button
-              size="sm"
-              variant="flat"
-              className="mt-4"
-              startContent={<RefreshCw size={14} />}
-              onPress={() => void refetch()}
-            >
+            <Button size="sm" variant="flat" className="mt-4" startContent={<RefreshCw size={14} />} onPress={() => void refetch()}>
               Try again
             </Button>
           )}
@@ -91,7 +85,9 @@ export function ShareView() {
         {isPending && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <KpiCardSkeleton key={i} />)}
+              {Array.from({ length: 4 }).map((_, i) => (
+                <KpiCardSkeleton key={i} />
+              ))}
             </div>
             <div className="mt-6">
               <ChartCardSkeleton height={260} />
@@ -111,19 +107,47 @@ export function ShareView() {
         {data && !data.latest && (
           <div className="rounded-2xl border border-runway-border/60 bg-runway-surface p-10 text-center">
             <p className="text-sm font-medium text-runway-text">No metrics recorded yet</p>
-            <p className="mt-1.5 text-xs text-runway-muted">
-              This link is valid, but the company has not entered a month of data.
-            </p>
+            <p className="mt-1.5 text-xs text-runway-muted">This link is valid, but the company has not entered a month of data.</p>
           </div>
         )}
 
         {data && data.latest && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <KpiCard icon={DollarSign} label="MRR" value={<CountUp value={data.latest.mrr} format={fmtCurrency} />} secondary={`${data.latest.derived.momGrowthRate ?? 0}% vs prior month`} trend="up" />
-              <KpiCard icon={Flame} label="Burn Rate" value={<CountUp value={data.latest.derived.threeMoAvgBurn ?? data.latest.burnRate} format={fmtCurrency} />} secondary={`3-mo avg · ${fmtCurrency(data.latest.burnRate)} actual`} />
-              <KpiCard icon={Gauge} label="Runway" value={<><CountUp value={data.latest.derived.runwayMonths ?? 0} format={(n) => n.toFixed(0)} /> mo</>} secondary={fmtCurrency(data.latest.cash)} zone={data.latest.derived.runwayZone} />
-              <KpiCard icon={DollarSign} label="Net Revenue Retention" value={<><CountUp value={data.latest.derived.nrr ?? 0} format={(n) => n.toFixed(1)} />%</>} secondary="12-mo basis" />
+              <KpiCard
+                icon={DollarSign}
+                label="MRR"
+                value={<CountUp value={data.latest.mrr} format={fmtCurrency} />}
+                secondary={`${data.latest.derived.momGrowthRate ?? 0}% vs prior month`}
+                trend="up"
+              />
+              <KpiCard
+                icon={Flame}
+                label="Burn Rate"
+                value={<CountUp value={data.latest.derived.threeMoAvgBurn ?? data.latest.burnRate} format={fmtCurrency} />}
+                secondary={`3-mo avg · ${fmtCurrency(data.latest.burnRate)} actual`}
+              />
+              <KpiCard
+                icon={Gauge}
+                label="Runway"
+                value={
+                  <>
+                    <CountUp value={data.latest.derived.runwayMonths ?? 0} format={(n) => n.toFixed(0)} /> mo
+                  </>
+                }
+                secondary={fmtCurrency(data.latest.cash)}
+                zone={data.latest.derived.runwayZone}
+              />
+              <KpiCard
+                icon={DollarSign}
+                label="Net Revenue Retention"
+                value={
+                  <>
+                    <CountUp value={data.latest.derived.nrr ?? 0} format={(n) => n.toFixed(1)} />%
+                  </>
+                }
+                secondary="12-mo basis"
+              />
             </div>
 
             <div className="mt-6 runway-card overflow-hidden">

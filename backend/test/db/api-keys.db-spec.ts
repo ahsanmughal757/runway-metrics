@@ -139,10 +139,7 @@ describe('API keys (db)', () => {
       const owner = await registerOwner(app);
       const created = await issue(owner, { scopes: ['metrics:read', 'reports:read'] }).expect(201);
 
-      await request(app.getHttpServer())
-        .get('/api/companies/api-keys')
-        .set({ 'X-Api-Key': created.body.secret })
-        .expect(403);
+      await request(app.getHttpServer()).get('/api/companies/api-keys').set({ 'X-Api-Key': created.body.secret }).expect(403);
     });
   });
 

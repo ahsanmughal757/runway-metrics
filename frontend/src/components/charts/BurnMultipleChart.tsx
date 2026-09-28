@@ -13,9 +13,20 @@ export function BurnMultipleChart({ snapshots }: { snapshots: Snapshot[] }) {
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 18, right: 12, left: 0, bottom: 0 }}>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
+        />
         <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={42} />
-        <Tooltip content={<ChartTooltip formatter={(v) => v.toFixed(2) + 'x'} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
+        <Tooltip
+          content={<ChartTooltip formatter={(v) => v.toFixed(2) + 'x'} />}
+          cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }}
+        />
         <ReferenceLine
           y={1}
           stroke={chartColors.muted}

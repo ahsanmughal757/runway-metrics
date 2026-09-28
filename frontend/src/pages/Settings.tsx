@@ -16,8 +16,7 @@ interface CompanySettings {
 }
 
 const inputClassNames = {
-  inputWrapper:
-    'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
+  inputWrapper: 'bg-white/[0.02] border border-runway-border/70 data-[hover=true]:bg-white/[0.03] rounded-xl shadow-soft',
   label: 'text-runway-muted',
 };
 
@@ -162,13 +161,7 @@ function SettingsForm({ settings, companyId }: { settings: CompanySettings; comp
       </div>
 
       {canEdit && (
-        <Button
-          color="primary"
-          size="sm"
-          className="w-fit bg-accent-gradient font-medium"
-          isLoading={save.isPending}
-          onPress={submit}
-        >
+        <Button color="primary" size="sm" className="w-fit bg-accent-gradient font-medium" isLoading={save.isPending} onPress={submit}>
           Save changes
         </Button>
       )}

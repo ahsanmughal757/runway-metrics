@@ -16,6 +16,8 @@
     "build": "pnpm -r run build",
     "db:generate": "pnpm --filter runway-backend run prisma:generate",
     "db:migrate": "pnpm --filter runway-backend run prisma:migrate",
+  "db:migrate:deploy": "pnpm --filter runway-backend run prisma:migrate:deploy",
+  "db:share-tokens:reencrypt": "pnpm --filter runway-backend run share-tokens:reencrypt",
     "db:seed": "pnpm --filter runway-backend run seed",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",

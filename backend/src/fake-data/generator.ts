@@ -162,7 +162,12 @@ export function generateSnapshots(personaKey: PersonaKey, months = 24, startDate
  * Fully deterministic, including the generated customer identifiers, so a seeded
  * database and a demo-mode request produce identical cohorts.
  */
-export function generateCohorts(personaKey: PersonaKey, cohortMonths = 12, trackMonths = 12, startDate = new Date(Date.UTC(2024, 0, 1))): GeneratedCustomer[] {
+export function generateCohorts(
+  personaKey: PersonaKey,
+  cohortMonths = 12,
+  trackMonths = 12,
+  startDate = new Date(Date.UTC(2024, 0, 1)),
+): GeneratedCustomer[] {
   const p = PERSONAS[personaKey];
   const customers: GeneratedCustomer[] = [];
 
@@ -172,8 +177,7 @@ export function generateCohorts(personaKey: PersonaKey, cohortMonths = 12, track
   // can never hand out colliding UUIDs.
   faker.seed(seedFrom('cohort-ids', seed));
 
-  const addMonth = (base: Date, offset: number) =>
-    new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1));
+  const addMonth = (base: Date, offset: number) => new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + offset, 1));
 
   for (let c = 0; c < cohortMonths; c++) {
     const signupMonth = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth() + c, 1));

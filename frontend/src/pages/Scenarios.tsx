@@ -48,8 +48,8 @@ export function Scenarios() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight text-runway-text">Runway Scenarios</h2>
         <p className="text-sm text-runway-muted mt-0.5">
-          Model how growth and burn changes would shift your cash runway from the latest snapshot
-          ({new Date(latest.month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}).
+          Model how growth and burn changes would shift your cash runway from the latest snapshot (
+          {new Date(latest.month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}).
         </p>
       </div>
       <div className="runway-card overflow-hidden">

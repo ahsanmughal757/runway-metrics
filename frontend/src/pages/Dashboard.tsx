@@ -117,10 +117,7 @@ export function Dashboard() {
         </div>
       </motion.div>
 
-      <motion.div
-        className="grid grid-cols-2 md:grid-cols-4 gap-4"
-        variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}
-      >
+      <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
         <KpiCard
           icon={DollarSign}
           label="MRR"
@@ -148,7 +145,11 @@ export function Dashboard() {
         <KpiCard
           icon={Gauge}
           label="Runway"
-          value={<><CountUp value={latest.derived.runwayMonths ?? 0} format={(n) => n.toFixed(0)} /> mo</>}
+          value={
+            <>
+              <CountUp value={latest.derived.runwayMonths ?? 0} format={(n) => n.toFixed(0)} /> mo
+            </>
+          }
           secondary={fmtCurrency(latest.cash)}
           zone={zone}
           onPress={() => jumpTo(sectionIds.mrr)}
@@ -215,17 +216,23 @@ export function Dashboard() {
 }
 
 function ChartCard({
-  id, title, children, registerRef, highlighted,
-}: { id: string; title: string; children: ReactNode; registerRef: (id: string, el: HTMLDivElement | null) => void; highlighted: string | null }) {
+  id,
+  title,
+  children,
+  registerRef,
+  highlighted,
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+  registerRef: (id: string, el: HTMLDivElement | null) => void;
+  highlighted: string | null;
+}) {
   // Target for the PNG export button; unrelated to the scroll-to refs.
   const chartRef = useRef<HTMLDivElement>(null);
   return (
     <div ref={(el) => registerRef(id, el)}>
-      <div
-        className={`runway-card transition-all duration-300 ${
-          highlighted === id ? 'border-runway-accent/50 shadow-glow' : ''
-        }`}
-      >
+      <div className={`runway-card transition-all duration-300 ${highlighted === id ? 'border-runway-accent/50 shadow-glow' : ''}`}>
         <div className="runway-sheen" />
         <div className="relative flex items-center gap-2.5 px-5 pt-5 pb-1">
           <span
@@ -238,7 +245,9 @@ function ChartCard({
             <ChartExportButton targetRef={chartRef} />
           </div>
         </div>
-        <div ref={chartRef} className="relative px-2 pb-3">{children}</div>
+        <div ref={chartRef} className="relative px-2 pb-3">
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -255,7 +264,14 @@ function EmptyDashboard() {
           <Button as="a" href="/metrics" color="primary" size="sm" startContent={<PlusCircle size={14} />}>
             Add snapshot
           </Button>
-          <Button as="a" href="/import" variant="bordered" size="sm" startContent={<Upload size={14} />} className="border-runway-border text-runway-text">
+          <Button
+            as="a"
+            href="/import"
+            variant="bordered"
+            size="sm"
+            startContent={<Upload size={14} />}
+            className="border-runway-border text-runway-text"
+          >
             Import CSV
           </Button>
         </div>
@@ -274,10 +290,18 @@ function DashboardSkeleton() {
       </div>
       <ChartCardSkeleton height={260} />
       <div className="grid md:grid-cols-12 gap-6">
-        <div className="md:col-span-7"><ChartCardSkeleton /></div>
-        <div className="md:col-span-5"><ChartCardSkeleton /></div>
-        <div className="md:col-span-5"><ChartCardSkeleton /></div>
-        <div className="md:col-span-7"><ChartCardSkeleton /></div>
+        <div className="md:col-span-7">
+          <ChartCardSkeleton />
+        </div>
+        <div className="md:col-span-5">
+          <ChartCardSkeleton />
+        </div>
+        <div className="md:col-span-5">
+          <ChartCardSkeleton />
+        </div>
+        <div className="md:col-span-7">
+          <ChartCardSkeleton />
+        </div>
       </div>
     </div>
   );

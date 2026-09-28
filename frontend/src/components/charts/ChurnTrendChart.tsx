@@ -26,7 +26,15 @@ export function ChurnTrendChart({ snapshots }: { snapshots: Snapshot[] }) {
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 18, right: 12, left: 0, bottom: 0 }}>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
+        />
         <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} width={42} />
         <Tooltip content={<ChartTooltip formatter={(v) => `${v}%`} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
         <Line

@@ -12,6 +12,8 @@
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "share-tokens:reencrypt": "tsx src/scripts/reencrypt-share-tokens.ts",
     "seed": "ts-node prisma/seed.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

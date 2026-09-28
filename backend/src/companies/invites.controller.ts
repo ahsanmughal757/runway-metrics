@@ -12,8 +12,8 @@ import { InvitesService } from './invites.service';
 
 class CreateInviteDto {
   @Transform(Trim)
-
-  @IsEmail() email!: string;
+  @IsEmail()
+  email!: string;
   @IsEnum(MembershipRole) role!: MembershipRole;
 }
 

@@ -211,10 +211,7 @@ describe('MetricsService', () => {
 
     it('records a CSV import with the row count and month range', async () => {
       const { service, audit } = build([], { importResult: 2 });
-      const rows = [
-        makeSnapshot({ month: new Date(Date.UTC(2024, 0, 1)) }),
-        makeSnapshot({ month: new Date(Date.UTC(2024, 5, 1)) }),
-      ];
+      const rows = [makeSnapshot({ month: new Date(Date.UTC(2024, 0, 1)) }), makeSnapshot({ month: new Date(Date.UTC(2024, 5, 1)) })];
 
       await service.commitCsv('c1', rows, 'user-3');
 

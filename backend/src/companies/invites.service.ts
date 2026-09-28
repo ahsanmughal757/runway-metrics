@@ -281,9 +281,7 @@ export class InvitesService {
     if (!invite) throw new NotFoundException('This invitation is not valid');
     if (invite.status !== InviteStatus.PENDING) {
       throw new ConflictException(
-        invite.status === InviteStatus.EXPIRED
-          ? 'This invitation has expired'
-          : 'This invitation has already been used',
+        invite.status === InviteStatus.EXPIRED ? 'This invitation has expired' : 'This invitation has already been used',
       );
     }
     if (invite.expiresAt.getTime() <= Date.now()) {

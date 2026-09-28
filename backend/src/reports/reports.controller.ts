@@ -36,11 +36,7 @@ export class ReportsController {
   @UseGuards(PermissionsGuard)
   @RequirePermission('reports:generate')
   @Header('Content-Type', 'application/pdf')
-  async generateInvestorUpdate(
-    @CurrentUser() user: RequestUser,
-    @Body() dto: GenerateReportDto,
-    @Res() res: Response,
-  ) {
+  async generateInvestorUpdate(@CurrentUser() user: RequestUser, @Body() dto: GenerateReportDto, @Res() res: Response) {
     const [{ snapshots, latest }, settings] = await Promise.all([
       this.metrics.getDashboard(user.companyId),
       this.companies.getSettings(user.companyId),

@@ -19,13 +19,33 @@ export function BurnCashChart({ snapshots }: { snapshots: Snapshot[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid {...gridStyle} />
-        <XAxis dataKey="month" tickFormatter={monthLabel} tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} minTickGap={24} />
-        <YAxis yAxisId="left" tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
-        <YAxis yAxisId="right" orientation="right" tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
-        <Tooltip
-          content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} />}
-          cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickMargin={8}
+          minTickGap={24}
         />
+        <YAxis
+          yAxisId="left"
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+          width={52}
+        />
+        <YAxis
+          yAxisId="right"
+          orientation="right"
+          tick={axisTickStyle}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+          width={52}
+        />
+        <Tooltip content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
         <Bar yAxisId="left" dataKey="burn" name="Burn" fill="url(#burnGradient)" radius={[4, 4, 0, 0]} barSize={14} />
         <Line
           yAxisId="right"

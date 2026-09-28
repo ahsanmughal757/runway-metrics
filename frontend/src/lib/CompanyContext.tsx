@@ -126,7 +126,12 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
    */
   const [preferredCompanyId, setPreferredCompanyId] = useState<string | null>(null);
 
-  const { data: bootstrap, isPending, isError, error } = useQuery({
+  const {
+    data: bootstrap,
+    isPending,
+    isError,
+    error,
+  } = useQuery({
     queryKey: sessionKey,
     queryFn: ({ signal }) => bootstrapQuery(signal),
     // Unconditional, and *not* gated on `isAuthenticated`. The absence of a local
@@ -163,9 +168,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
    * previous tenant's numbers cannot be reached.
    */
   const activeCompanyId = bootstrap
-    ? (bootstrap.companies.some((c) => c.id === preferredCompanyId)
-        ? preferredCompanyId
-        : (bootstrap.companies.find((c) => c.id === bootstrap.me.companyId)?.id ?? bootstrap.companies[0]?.id ?? null))
+    ? bootstrap.companies.some((c) => c.id === preferredCompanyId)
+      ? preferredCompanyId
+      : (bootstrap.companies.find((c) => c.id === bootstrap.me.companyId)?.id ?? bootstrap.companies[0]?.id ?? null)
     : null;
 
   /**

@@ -2,11 +2,7 @@ import type { Config } from 'tailwindcss';
 import { heroui } from '@heroui/theme';
 
 export default {
-  content: [
-    './index.html',
-    './src/**/*.{ts,tsx}',
-    './node_modules/@heroui/theme/dist/**/*.{js,mjs}',
-  ],
+  content: ['./index.html', './src/**/*.{ts,tsx}', './node_modules/@heroui/theme/dist/**/*.{js,mjs}'],
   darkMode: 'class',
   theme: {
     extend: {
@@ -43,7 +39,7 @@ export default {
       backgroundImage: {
         'accent-gradient': 'linear-gradient(135deg, #6f7cff 0%, #a78bfa 100%)',
         'surface-gradient': 'linear-gradient(180deg, rgba(255,255,255,0.045) 0%, rgba(255,255,255,0.01) 100%)',
-        'shine': 'linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 55%)',
+        shine: 'linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 55%)',
       },
       keyframes: {
         'fade-up': { '0%': { opacity: '0', transform: 'translateY(6px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
@@ -102,10 +98,18 @@ export default {
             divider: '#1b2233',
             focus: '#6f7cff',
             default: {
-              50: '#10141d', 100: '#0d1119', 200: '#1b2233', 300: '#2b3449',
-              400: '#4a5470', 500: '#8892a8', 600: '#a7b0c2', 700: '#c9d0dd',
-              800: '#e8ecf5', 900: '#f6f8fc',
-              foreground: '#e8ecf5', DEFAULT: '#1b2233',
+              50: '#10141d',
+              100: '#0d1119',
+              200: '#1b2233',
+              300: '#2b3449',
+              400: '#4a5470',
+              500: '#8892a8',
+              600: '#a7b0c2',
+              700: '#c9d0dd',
+              800: '#e8ecf5',
+              900: '#f6f8fc',
+              foreground: '#e8ecf5',
+              DEFAULT: '#1b2233',
             },
             primary: { DEFAULT: '#6f7cff', foreground: '#ffffff' },
             secondary: { DEFAULT: '#a78bfa', foreground: '#0a0c12' },
@@ -124,10 +128,18 @@ export default {
             divider: '#e2e9f2',
             focus: '#6f7cff',
             default: {
-              50: '#ffffff', 100: '#eef1f7', 200: '#e2e9f2', 300: '#cbd5e1',
-              400: '#64748b', 500: '#475569', 600: '#334155', 700: '#293548',
-              800: '#1a2333', 900: '#0f172a',
-              foreground: '#1a2333', DEFAULT: '#e2e9f2',
+              50: '#ffffff',
+              100: '#eef1f7',
+              200: '#e2e9f2',
+              300: '#cbd5e1',
+              400: '#64748b',
+              500: '#475569',
+              600: '#334155',
+              700: '#293548',
+              800: '#1a2333',
+              900: '#0f172a',
+              foreground: '#1a2333',
+              DEFAULT: '#e2e9f2',
             },
             primary: { DEFAULT: '#6f7cff', foreground: '#ffffff' },
             secondary: { DEFAULT: '#a78bfa', foreground: '#1a2333' },

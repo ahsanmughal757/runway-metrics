@@ -104,7 +104,7 @@ function stubServerByHeader(mrr: Record<string, number>) {
 }
 
 describe('tenant isolation', () => {
-  it('does not show the previous company\'s data after switching', async () => {
+  it("does not show the previous company's data after switching", async () => {
     const calls = stubServerByHeader({ [COMPANY_A]: 1000, [COMPANY_B]: 9000 });
 
     localStorage.setItem(ACTIVE_KEY, COMPANY_A);

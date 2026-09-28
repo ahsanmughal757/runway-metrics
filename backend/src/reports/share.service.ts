@@ -63,7 +63,14 @@ export class ShareService {
 
     if (!env.ENABLE_DATABASE) {
       demoStore.set(token, { companyId, createdAt: now.getTime() });
-      return { token, url: `/share/${token}`, expiresAt: expiresAt.toISOString(), createdAt: now.toISOString(), viewCount: 0, isRevoked: false };
+      return {
+        token,
+        url: `/share/${token}`,
+        expiresAt: expiresAt.toISOString(),
+        createdAt: now.toISOString(),
+        viewCount: 0,
+        isRevoked: false,
+      };
     }
 
     return this.prisma.$transaction(async (tx) => {

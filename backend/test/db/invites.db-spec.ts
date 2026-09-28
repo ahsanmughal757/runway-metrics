@@ -17,15 +17,7 @@
  */
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import {
-  closeApp,
-  freshDb,
-  makeApp,
-  PASSWORD,
-  prisma,
-  registerOwner,
-  uniqueEmail,
-} from './harness';
+import { closeApp, freshDb, makeApp, PASSWORD, prisma, registerOwner, uniqueEmail } from './harness';
 import { hashToken } from '../../src/reports/share.service';
 
 const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000);
@@ -66,11 +58,7 @@ describe('invites and share links (real database)', () => {
   });
 
   /** Issues an invitation and returns the summary plus the raw token. */
-  async function inviteAs(
-    owner: { accessToken: string; companyId: string },
-    email: string,
-    role = 'VIEWER',
-  ) {
+  async function inviteAs(owner: { accessToken: string; companyId: string }, email: string, role = 'VIEWER') {
     const res = await request(app.getHttpServer())
       .post('/api/companies/invites')
       .set(as(owner.accessToken, owner.companyId))
@@ -228,10 +216,7 @@ describe('invites and share links (real database)', () => {
       const owner = await registerOwner(app);
       const { token, id } = await inviteAs(owner, uniqueEmail('gone'));
 
-      await request(app.getHttpServer())
-        .delete(`/api/companies/invites/${id}`)
-        .set(as(owner.accessToken, owner.companyId))
-        .expect(200);
+      await request(app.getHttpServer()).delete(`/api/companies/invites/${id}`).set(as(owner.accessToken, owner.companyId)).expect(200);
 
       const res = await request(app.getHttpServer()).get(`/api/invites/preview/${token}`).expect(200);
       expect(res.body.isValid).toBe(false);
@@ -335,19 +320,13 @@ describe('invites and share links (real database)', () => {
       const invitee = uniqueEmail('once');
       const { token } = await inviteAs(owner, invitee);
 
-      await request(app.getHttpServer())
-        .post('/api/invites/redeem')
-        .send({ token, email: invitee, password: PASSWORD })
-        .expect(201);
+      await request(app.getHttpServer()).post('/api/invites/redeem').send({ token, email: invitee, password: PASSWORD }).expect(201);
 
       const row = await prisma.invite.findUniqueOrThrow({ where: { token } });
       expect(row.status).toBe('ACCEPTED');
       expect(row.respondedAt).not.toBeNull();
 
-      await request(app.getHttpServer())
-        .post('/api/invites/redeem')
-        .send({ token, email: invitee, password: PASSWORD })
-        .expect(409);
+      await request(app.getHttpServer()).post('/api/invites/redeem').send({ token, email: invitee, password: PASSWORD }).expect(409);
 
       // One invitation, one extra member. Not two.
       expect(await prisma.companyMembership.count({ where: { companyId: owner.companyId } })).toBe(2);
@@ -360,10 +339,7 @@ describe('invites and share links (real database)', () => {
       await prisma.invite.update({ where: { id }, data: ageRow() });
       const { token } = await prisma.invite.findUniqueOrThrow({ where: { id } });
 
-      await request(app.getHttpServer())
-        .post('/api/invites/redeem')
-        .send({ token, email: invitee, password: PASSWORD })
-        .expect(403);
+      await request(app.getHttpServer()).post('/api/invites/redeem').send({ token, email: invitee, password: PASSWORD }).expect(403);
 
       // Marked, so the company's invite list stops showing it as pending.
       const row = await prisma.invite.findUniqueOrThrow({ where: { id } });
@@ -376,15 +352,9 @@ describe('invites and share links (real database)', () => {
       const invitee = uniqueEmail('revoked');
       const { id, token } = await inviteAs(owner, invitee);
 
-      await request(app.getHttpServer())
-        .delete(`/api/companies/invites/${id}`)
-        .set(as(owner.accessToken, owner.companyId))
-        .expect(200);
+      await request(app.getHttpServer()).delete(`/api/companies/invites/${id}`).set(as(owner.accessToken, owner.companyId)).expect(200);
 
-      await request(app.getHttpServer())
-        .post('/api/invites/redeem')
-        .send({ token, email: invitee, password: PASSWORD })
-        .expect(409);
+      await request(app.getHttpServer()).post('/api/invites/redeem').send({ token, email: invitee, password: PASSWORD }).expect(409);
       expect(await prisma.user.count({ where: { email: invitee } })).toBe(0);
     });
   });
@@ -395,11 +365,7 @@ describe('invites and share links (real database)', () => {
       const joiner = await registerOwner(app, uniqueEmail('joiner'), 'Their Co');
       const { token } = await inviteAs(owner, joiner.email, 'ANALYST');
 
-      const res = await request(app.getHttpServer())
-        .post('/api/invites/accept')
-        .set(as(joiner.accessToken))
-        .send({ token })
-        .expect(201);
+      const res = await request(app.getHttpServer()).post('/api/invites/accept').set(as(joiner.accessToken)).send({ token }).expect(201);
 
       expect(res.body.createdAccount).toBe(false);
       expect(res.body.companyId).toBe(owner.companyId);
@@ -421,11 +387,7 @@ describe('invites and share links (real database)', () => {
       const { token } = await inviteAs(owner, uniqueEmail('invitee'));
       const stranger = await registerOwner(app, uniqueEmail('stranger'), 'Stranger Co');
 
-      await request(app.getHttpServer())
-        .post('/api/invites/accept')
-        .set(as(stranger.accessToken))
-        .send({ token })
-        .expect(403);
+      await request(app.getHttpServer()).post('/api/invites/accept').set(as(stranger.accessToken)).send({ token }).expect(403);
     });
   });
 
@@ -435,10 +397,7 @@ describe('invites and share links (real database)', () => {
       const other = await registerOwner(app, uniqueEmail('other'), 'Other Co');
       const { id } = await inviteAs(owner, uniqueEmail('invitee'));
 
-      await request(app.getHttpServer())
-        .delete(`/api/companies/invites/${id}`)
-        .set(as(other.accessToken, other.companyId))
-        .expect(404);
+      await request(app.getHttpServer()).delete(`/api/companies/invites/${id}`).set(as(other.accessToken, other.companyId)).expect(404);
 
       expect((await prisma.invite.findUniqueOrThrow({ where: { id } })).status).toBe('PENDING');
     });
@@ -447,15 +406,9 @@ describe('invites and share links (real database)', () => {
       const owner = await registerOwner(app);
       const invitee = uniqueEmail('used');
       const { id, token } = await inviteAs(owner, invitee);
-      await request(app.getHttpServer())
-        .post('/api/invites/redeem')
-        .send({ token, email: invitee, password: PASSWORD })
-        .expect(201);
+      await request(app.getHttpServer()).post('/api/invites/redeem').send({ token, email: invitee, password: PASSWORD }).expect(201);
 
-      await request(app.getHttpServer())
-        .delete(`/api/companies/invites/${id}`)
-        .set(as(owner.accessToken, owner.companyId))
-        .expect(409);
+      await request(app.getHttpServer()).delete(`/api/companies/invites/${id}`).set(as(owner.accessToken, owner.companyId)).expect(409);
     });
   });
 
@@ -474,9 +427,7 @@ describe('invites and share links (real database)', () => {
       expect(link.body.isRevoked).toBe(false);
 
       // No Authorization header: the token is the credential.
-      const pub = await request(app.getHttpServer())
-        .get(`/api/public/dashboard/${link.body.token}`)
-        .expect(200);
+      const pub = await request(app.getHttpServer()).get(`/api/public/dashboard/${link.body.token}`).expect(200);
 
       expect(pub.body.snapshots).toHaveLength(1);
       expect(String(pub.body.latest.mrr)).toBe('12000');
@@ -551,46 +502,30 @@ describe('invites and share links (real database)', () => {
         .set(as(owner.accessToken, owner.companyId))
         .expect(201);
 
-      const unknown = await request(app.getHttpServer())
-        .get('/api/public/dashboard/never-existed')
-        .expect(404);
-      const revoked = await request(app.getHttpServer())
-        .get('/api/public/dashboard/never-existed')
-        .expect(404);
+      const unknown = await request(app.getHttpServer()).get('/api/public/dashboard/never-existed').expect(404);
+      const revoked = await request(app.getHttpServer()).get('/api/public/dashboard/never-existed').expect(404);
       expect(unknown.body.message).toBe(revoked.body.message);
       expect(unknown.body.message).toBe('Invalid or expired share link');
       expect(link.body.token).toBeTruthy();
     });
 
-    it('will not let one company revoke another company\'s link', async () => {
+    it("will not let one company revoke another company's link", async () => {
       const a = await registerOwner(app, uniqueEmail('a'), 'A Co');
       const b = await registerOwner(app, uniqueEmail('b'), 'B Co');
-      const link = await request(app.getHttpServer())
-        .post('/api/reports/share-link')
-        .set(as(a.accessToken, a.companyId))
-        .expect(201);
+      const link = await request(app.getHttpServer()).post('/api/reports/share-link').set(as(a.accessToken, a.companyId)).expect(201);
       const row = await prisma.shareLink.findUniqueOrThrow({ where: { tokenHash: hashToken(link.body.token) } });
 
-      await request(app.getHttpServer())
-        .delete(`/api/reports/share-links/${row.id}`)
-        .set(as(b.accessToken, b.companyId))
-        .expect(404);
+      await request(app.getHttpServer()).delete(`/api/reports/share-links/${row.id}`).set(as(b.accessToken, b.companyId)).expect(404);
 
       expect((await prisma.shareLink.findUniqueOrThrow({ where: { id: row.id } })).revokedAt).toBeNull();
     });
 
-    it('lists only the caller\'s own links', async () => {
+    it("lists only the caller's own links", async () => {
       const a = await registerOwner(app, uniqueEmail('a'), 'A Co');
       const b = await registerOwner(app, uniqueEmail('b'), 'B Co');
-      await request(app.getHttpServer())
-        .post('/api/reports/share-link')
-        .set(as(a.accessToken, a.companyId))
-        .expect(201);
+      await request(app.getHttpServer()).post('/api/reports/share-link').set(as(a.accessToken, a.companyId)).expect(201);
 
-      const res = await request(app.getHttpServer())
-        .get('/api/reports/share-links')
-        .set(as(b.accessToken, b.companyId))
-        .expect(200);
+      const res = await request(app.getHttpServer()).get('/api/reports/share-links').set(as(b.accessToken, b.companyId)).expect(200);
 
       expect(res.body).toEqual([]);
     });

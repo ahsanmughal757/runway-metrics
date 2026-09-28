@@ -52,9 +52,7 @@ export class CohortsRepository {
 
     // $queryRaw is parameterised through Prisma.sql rather than interpolated, so
     // companyId is bound, not parsed as SQL.
-    const cells = await this.prisma.$queryRaw<
-      { signupMonth: Date; offset: number; activeCustomers: number; revenue: number }[]
-    >(Prisma.sql`
+    const cells = await this.prisma.$queryRaw<{ signupMonth: Date; offset: number; activeCustomers: number; revenue: number }[]>(Prisma.sql`
       SELECT
         c."signupMonth"                                              AS "signupMonth",
         (EXTRACT(YEAR  FROM age(v."month", c."signupMonth")) * 12
@@ -122,9 +120,7 @@ function aggregateInMemory(customers: ReturnType<typeof generateCohorts>): Cohor
       const offset =
         (value.month.getUTCFullYear() - customer.signupMonth.getUTCFullYear()) * 12 +
         (value.month.getUTCMonth() - customer.signupMonth.getUTCMonth());
-      const existing = cells.find(
-        (c) => c.signupMonth.getTime() === customer.signupMonth.getTime() && c.offset === offset,
-      );
+      const existing = cells.find((c) => c.signupMonth.getTime() === customer.signupMonth.getTime() && c.offset === offset);
       if (existing) {
         if (value.mrr > 0) existing.activeCustomers += 1;
         existing.revenue += value.mrr;

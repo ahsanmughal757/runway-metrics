@@ -30,11 +30,11 @@ export function CohortLtvChart({ rows }: { rows: CohortRow[] }) {
         <CartesianGrid {...gridStyle} />
         <XAxis dataKey="offset" tick={axisTickStyle} axisLine={false} tickLine={false} tickMargin={8} />
         <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={52} />
-        <Tooltip content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} labelFormatter={(l) => `Month ${l}`} />} cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }} />
-        <Legend
-          wrapperStyle={{ fontSize: 11, color: chartColors.muted }}
-          iconType="plainline"
+        <Tooltip
+          content={<ChartTooltip formatter={(v) => `$${v.toLocaleString()}`} labelFormatter={(l) => `Month ${l}`} />}
+          cursor={{ stroke: chartColors.axis, strokeDasharray: '3 6' }}
         />
+        <Legend wrapperStyle={{ fontSize: 11, color: chartColors.muted }} iconType="plainline" />
         {recent.map((r, i) => (
           <Line
             key={r.cohortLabel}
