@@ -1,0 +1,113 @@
+# Runs the whole gate on every push, including the suite that needs a real
+# database.
+#
+# The reason this file exists: `pnpm verify` deliberately skips `test:db`, because
+# running it needs a Postgres and nobody wants that as the default for a quick
+# local check. The consequence was that the only suite able to catch a broken
+# query, a missing constraint, or a permission rule that lives in the database
+# path also never ran automatically. Every regression in phases 1-3 that reached
+# main was of exactly that shape, and the cohort SQL that shipped with a missing
+# quote passed every other suite.
+#
+# So: quick local check stays `verify`, and the authoritative check is this file.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes an in-flight run for the same ref. Without this a
+# sequence of pushes queues every run and CI reports the state of a commit
+# nobody cares about.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # One job rather than a matrix. The three suites share one Postgres and one
+    # checkout, and splitting them would mean either a matrix (three times the
+    # Postgres startup and install cost, to run the same commands) or three
+    # jobs wired together (harder to read, and a failure in the first one would
+    # hide whether the others pass). The gate is ~4 minutes; that is acceptable
+    # for the only check that is allowed to say "this is broken".
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        # Pinned to a major version and the alpine variant: `16-alpine` matches
+        # docker-compose.yml, so CI and a developer's local database are the
+        # same engine. A suite that passes on one major and fails on another is
+        # a suite that has taught everyone to ignore it.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          # Not a real secret. It is a throwaway container that lives for the
+          # length of one job and is reachable from nothing.
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: runway
+        ports:
+          - 5432:5432
+        # Without this, the first thing that runs is `prisma migrate deploy`
+        # against a database that is not listening yet, and the failure looks
+        # like a migration error. GitHub starts the job the moment the container
+        # *starts*, not the moment it is ready.
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm's own action rather than a `npm i -g pnpm`: it installs the version
+      # the repo's `packageManager` field pins, so a contributor on pnpm 9 and a
+      # contributor on pnpm 10 are not silently resolving dependencies
+      # differently. The Node version is read from `.nvmrc` (22.12.0) for the
+      # same reason, and it is also what `engines.node` requires.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Format check
+        run: pnpm run format:check
+
+      - name: Unit tests (backend + frontend)
+        run: pnpm run test
+
+      - name: E2E tests
+        run: pnpm run test:e2e
+
+      - name: Build
+        run: pnpm run build
+
+      # The suite that justifies this file. It is separate from the step above
+      # rather than folded into `verify:full` so that when it fails, the log says
+      # "test:db failed" and nobody has to read a list of eight green checkmarks
+      # to work that out.
+      #
+      # DATABASE_URL points at the service container. `runway_test` is a separate
+      # database from the one migrations are applied to, because these tests
+      # truncate tables between suites and must never be one `migrate deploy`
+      # away from real data.
+      - name: Database tests (real Postgres)
+        env:
+          NODE_ENV: test
+          ENABLE_DATABASE: 'true'
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/runway_test?schema=public
+        run: pnpm --filter runway-backend run test:db

@@ -1,0 +1,8 @@
+# Prettier reads `.prettierignore` from its working directory, and this package
+# runs `prettier --check .` with `backend/` as that directory — so the repo-root
+# ignore file does not apply here and has to be repeated. Both copies must stay
+# in step; the root one is commented to say so.
+dist/
+coverage/
+node_modules/
+pnpm-lock.yaml

@@ -1,16 +1,148 @@
-version: "3.8"
+# Runway: local development database, and the production stack.
+#
+# One file for both, deliberately. `pnpm dev:db` / `pnpm db:stop` operate on the
+# `postgres` service by name, so local development depends on this file keeping
+# that service's published port at 127.0.0.1:5432 - backend/test/setup-env.db.ts
+# and backend/test/db-global-setup.ts both hardcode that address, and the CI
+# Phase 6 adds runs the same suites against this same container. Changing the
+# port mapping or the credentials here breaks `pnpm test:db` first and the
+# application second.
+#
+# The `version` key that used to be here is gone. Compose v2 has ignored it since
+# 2021 and now warns on every invocation; the spec it selected is implied by the
+# Compose Specification, and Compose v5 (this machine) is the version in use.
+
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      # The default is a development convenience, not a deployment one. On the
+      # VPS this must be set in the shell that runs compose, or in a `.env` file
+      # next to this one. The reason it is worth being careful about: postgres
+      # only applies POSTGRES_PASSWORD when it initialises an *empty* data
+      # directory, and runway_pg_data is a long-lived volume - so changing this
+      # value after the first `up` does not change the stored password, it just
+      # makes every subsequent connection fail against a database that is
+      # working perfectly.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: runway
     ports:
-      - "5432:5432"
+      # 127.0.0.1, not a bare "5432:5432". A bare mapping binds every interface,
+      # which on a VPS is a world-reachable PostgreSQL whose password is a
+      # well-known default - the classic first thing scanned. Loopback is
+      # enough for everything here: the test suites connect to 127.0.0.1:5432 by
+      # hardcoded address, and on the server the only other client is the `api`
+      # service, which reaches postgres by service name on the compose network
+      # and never through this mapping.
+      - "127.0.0.1:5432:5432"
+    # `pnpm dev:db` returns as soon as the container is *created*, which is
+    # before initdb has finished, so the first `pnpm test:db` after a cold start
+    # fails with a connection refused against a database that is seconds from
+    # being ready. pg_isready is the check, and a dependent service gated on
+    # service_healthy is what makes "the database is up" mean the database
+    # accepts connections rather than that a process exists.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d runway"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
     volumes:
       - runway_pg_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    # No `ports:`. The API's only client is the `web` service, which runs
+    # deploy/nginx/default.conf and reaches this as `api:4000` on the compose
+    # network. Publishing 4000 would give the API a second entrypoint that skips
+    # TLS, the security headers and the document CSP - and default.conf states in
+    # its upstream block that this is the one arrangement the config assumes
+    # cannot happen, so a `ports:` entry here would silently invalidate it. Local
+    # development does not want it either: `pnpm dev:api` runs on the host.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Absent on a fresh clone, and deliberately not fatal. A missing env file
+    # must not stop `docker compose up postgres` - that is the local development
+    # path and it needs no secrets - so the api instead boots without them and
+    # env.ts refuses it: with NODE_ENV=production from the image, ENABLE_DATABASE
+    # defaults to false and BYPASS_AUTH to false, and the production refinement
+    # rejects that combination. It exits non-zero with a message naming the
+    # variable. Failing closed is the point; serving generated demo data as
+    # production would not be.
+    #
+    # deploy/api.env is the production file and is not committed. It must set
+    # JWT_SECRET, CREDENTIALS_MASTER_KEY, CORS_ORIGINS and COOKIE_SECURE=true;
+    # backend/.env.example documents every variable and is the wrong file to copy
+    # verbatim, because its defaults are development ones.
+    env_file:
+      - path: ./deploy/api.env
+        required: false
+    environment:
+      # The compose network address of the database service, not 127.0.0.1:
+      # inside a container the loopback is the container's own network namespace,
+      # and the host mapping above is not visible from in here.
+      #
+      # The password is interpolated rather than hardcoded so the api and the
+      # database cannot end up with different ones, which is a failure that
+      # presents as an authentication error and nothing else.
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/runway?schema=public
+      ENABLE_DATABASE: "true"
+      # Must match `server api:4000` in deploy/nginx/default.conf.
+      PORT: "4000"
+
+  # The public entrypoint: the only service with published ports. It terminates
+  # TLS, serves the built SPA, applies the document security headers, and proxies
+  # /api to the api service. The config is baked into the image by the Dockerfile's
+  # `web` target rather than bind-mounted, so the image and the config cannot
+  # drift apart in what is actually running.
+  web:
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      # Per-deployment and rotating, so they are never baked into an image layer.
+      # This mount is also why the image cannot start on a fresh clone: nginx
+      # refuses a config whose ssl_certificate is missing, and that is deliberate.
+      # A front door that comes up on :80 because a cert was forgotten is the
+      # failure this whole layer exists to prevent.
+      - ./deploy/certs:/etc/nginx/certs:ro
+    healthcheck:
+      # Against 443 with an explicit Host header, not against :80. The :80 server
+      # is a redirect, so an HTTP probe would be answering "the redirect exists",
+      # which says nothing about the app; and /health cannot be used because
+      # default.conf deliberately 404s it.
+      #
+      # --no-check-certificate because the certificate is issued for the real
+      # domain, not 127.0.0.1. The Host header is what makes nginx select the
+      # right server block at all (nginx matches on SNI first, then Host), so
+      # without it this probes the default server rather than the real one.
+      #
+      # Fetching `/` also proves the thing most worth knowing: that a document
+      # was actually served, so the SPA fallback resolved and the assets were
+      # mounted. A probe on a path that always 404s would pass on a container
+      # serving nothing.
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --no-check-certificate --header='Host: runway.example.com' -O /dev/null https://127.0.0.1/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
 volumes:
   runway_pg_data:
